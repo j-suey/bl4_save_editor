@@ -1,4 +1,5 @@
-pyyaml>=6.0      # for reading/writing YAML
-typer>=0.12.3    # for CLI commands (like argparse but nicer)
-rich>=13.7.1     # pretty terminal output, optional
-pydantic>=2.7.0  # schema validation for YAML structure
+pyyaml>=6.0         # read/write YAML
+typer>=0.12.3       # CLI framework
+rich>=13.7.1        # pretty terminal output (optional but nice)
+pydantic>=2.7.0     # schema validation
+pycryptodome>=3.15.0  # crypto for save file handling
