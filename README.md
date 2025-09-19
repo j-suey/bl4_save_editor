@@ -1,12 +1,18 @@
 # bl4_save_editor (Epic and Steam)
 A lightweight, Python-based save editor for BL4. Export saves to YAML, edit values, and write them back safely. No EXEs included — run it your way.
 
-# BL4 Save Editor (WIP)
+# BL4 Save Editor (WIP) Expect bugs - Made with some love! 
 
 Edit and inspect BL4 character saves via a simple, script-friendly workflow — no bundled EXEs. You control your environment, run it locally, and customize as you like.
 
 > **Back up your saves first.** This tool directly reads/writes save files; always keep a manual backup before making changes.
 
+
+# Make sure Python and pip are available
+python --version
+pip --version
+# Install required dependencies
+pip install "pyyaml>=6.0" "typer>=0.12.3" "rich>=13.7.1" "pydantic>=2.7.0" "pycryptodome>=3.15.0"
 ---
 
 ## Features (initial scope)
