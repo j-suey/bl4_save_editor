@@ -1,7 +1,7 @@
 
 #!/usr/bin/env python3
 """
-BL4 Unified Save Editor — v1.0a (full, hotfix-2)
+BL4 Unified Save Editor — v1.02a (full, hotfix-2)
 - Fix: Character/Progression read/write whether data is at YAML root or under "state"
 - UI: Dark + teal accents for better legibility
 - Character tab: adds Cash, Eridium, SHIFT (gold) Keys with auto-path detection
@@ -257,8 +257,8 @@ def _extract_fields(b: bytes)->Dict[str,Union[int, List[int]]]:
     # first bytes
     flags=[]
     for i in range(min(len(b), 20)):
-        bv=b; fields[f'byte_{i}']=bv
-        if bv < 100: flags.append((i,bv))
+        bv=b[i]; fields[f'byte_{i}']=bv
+        if isinstance(bv, int) and bv < 100: flags.append((i,bv))
     fields['potential_flags']=flags
     return fields
 
@@ -457,11 +457,15 @@ def walk_ug(node: Any, path: str = "")->List[Tuple[str,str]]:
 def tokens(path: str)->List[Any]:
     toks=[]; i=0
     while i<len(path):
-        if path=='[':
-            j=path.find(']',i); toks.append(int(path[i+1:j])); i=j+1
+        if path[i]=='[':
+            j=path.find(']',i)
+            toks.append(int(path[i+1:j]))
+            i=j+1
         else:
-            j=path.find('/',i); seg=path[i:] if j==-1 else path[i:j]
-            toks.append(seg); i=len(path) if j==-1 else j+1
+            j=path.find('/',i)
+            seg=path[i:] if j==-1 else path[i:j]
+            toks.append(seg)
+            i=len(path) if j==-1 else j+1
     return [t for t in toks if t!=""]
 def set_by(obj: Any, toks: List[Any], val: Any)->None:
     cur=obj
