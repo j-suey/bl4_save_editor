@@ -1,7 +1,7 @@
 
 #!/usr/bin/env python3
 """
-BL4 Unified Save Editor — v1.033a 
+BL4 Unified Save Editor — v1.04a 
 - Fix: Character/Progression read/write whether data is at YAML root or under "state"
 - UI: Dark + teal accents for better legibility
 - Character tab: adds Cash, Eridium, SHIFT (gold) Keys with auto-path detection
@@ -12,8 +12,287 @@ Dependencies:
 """
 
 from pathlib import Path
+
+
+# ====== Built-in Advanced Decoder (embedded; compressed) ======
+import base64 as _b64, zlib as _zl
+_DEC_NS = None
+_DECODER_B64 = """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"""
+def _load_embedded_decoder():
+    global _DEC_NS
+    if _DEC_NS is not None: return _DEC_NS
+    try:
+        src = _zl.decompress(_b64.b64decode(_DECODER_B64))
+        ns = {}; ns["__name__"] = "bl4_embedded_decoder"
+        exec(src, ns, ns)
+        _DEC_NS = ns
+    except Exception as e:
+        print("[decoder] embed load failed:", e); _DEC_NS = {}
+    return _DEC_NS
+
+# --- Decoder adapter: tolerate different function names & return shapes ---
+def _get_decoder_fn(ns):
+    for name in ("decode_item_serial","adv_decode_item_serial","decode_serial","decode","parse_item_serial","item_decode"):
+        fn = ns.get(name)
+        if callable(fn):
+            return fn
+    return None
+
+def _extract_name_from_decoded(obj):
+    # dict-like
+    try:
+        if isinstance(obj, dict):
+            for k in ("weapon_name","friendly_name","name","label","title","gun_name","item_name"):
+                if k in obj and isinstance(obj[k], str) and obj[k].strip():
+                    return obj[k]
+    except Exception:
+        pass
+    # object-like
+    try:
+        for k in ("weapon_name","friendly_name","name","label","title","gun_name","item_name"):
+            v = getattr(obj, k, None)
+            if isinstance(v, str) and v.strip():
+                return v
+    except Exception:
+        pass
+    # tuple/list
+    try:
+        if isinstance(obj, (list, tuple)) and obj:
+            if isinstance(obj[0], str) and obj[0].strip():
+                return obj[0]
+            if isinstance(obj[0], dict):
+                return _extract_name_from_decoded(obj[0])
+    except Exception:
+        pass
+    return ""
+
+
+def _to_int_sane(x, default=0):
+    try:
+        s = str(x).strip()
+        if s == "" or s.lower() == "none":
+            return default
+        return int(s, 0) if s.lower().startswith("0x") else int(''.join(ch for ch in s if ch in "-0123456789") or default)
+    except Exception:
+        return default
+
+
+def adv_decode_item_serial(serial):
+    serial = str(serial).strip()
+    ns = _load_embedded_decoder()
+    fn = _get_decoder_fn(ns)
+    if callable(fn):
+        try:
+            return fn(serial)
+        except Exception as e:
+            print("[decoder] decode error:", e)
+    return None
+
+def resolve_item_name(serial: str, decoded=None) -> str:
+    try:
+        if decoded is None:
+            decoded = adv_decode_item_serial(serial.strip())
+        nm = _extract_name_from_decoded(decoded)
+        if nm:
+            return nm
+        if "_friendly_from_decoded" in globals():
+            try:
+                return _friendly_from_decoded(decoded)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    if "_friendly_from_decoded" in globals():
+        try:
+            return _friendly_from_decoded(None)
+        except Exception:
+            pass
+    return ""
+def _safe_unpack_item_values(vals):
+    vals = list(vals) if isinstance(vals, (list, tuple)) else [vals]
+    if len(vals) == 4:
+        path, typ, code, serial = vals
+        return path, typ, "", code, serial, ""
+    while len(vals) < 6: vals.append("")
+    return tuple(vals[:6])
+
+
+
+# -------- Advanced decoder loader --------
+_ADV_DECODER = None
+def _get_adv_decoder():
+    """
+
+    """
+    import os, importlib.util
+    global _ADV_DECODER
+    if _ADV_DECODER is not None:
+        return _ADV_DECODER
+    try:
+        base = os.path.dirname(__file__)
+    except Exception:
+        base = os.getcwd()
+    for cand in ("main.py", "decoder.py"): #support for future decoders
+        path = os.path.join(base, cand)
+        if os.path.exists(path):
+            try:
+                spec = importlib.util.spec_from_file_location("bl4_ext_decoder", path)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)  # type: ignore
+                fn = getattr(mod, "decode_item_serial", None)
+                if callable(fn):
+                    _ADV_DECODER = fn
+                    return fn
+            except Exception:
+                _ADV_DECODER = None
+                return None
+    _ADV_DECODER = None
+    return None
+
+
+
+def _safe_unpack_item_values(vals):
+    """Return a 6-tuple (path, type, name, code, serial, tags) from a Treeview 'values'.
+    Accepts legacy 4-tuples and pads name/tags when missing.
+    """
+    vals = list(vals) if isinstance(vals, (list, tuple)) else [vals]
+    # legacy: (path,type,code,serial)
+    if len(vals) == 4:
+        path, typ, code, serial = vals
+        name = ""
+        tags = ""
+        return path, typ, name, code, serial, tags
+    # new: (path,type,name,code,serial,tags)
+    if len(vals) >= 6:
+        return vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]
+    # unknown shape -> best effort
+    while len(vals) < 6:
+        vals.append("")
+    return tuple(vals[:6])
+
+
+
+# ------------------------------------------------------------------
+# WEAPON_NAME_MAP
+# Groupings follow BL4's internal balance ID structure (game order).
+# Add new entries inside the relevant category.
+# ------------------------------------------------------------------
+WEAPON_NAME_MAP = {
+    # Assault Rifles
+    "BalanceId_AssaultRifle_Atlas_01": "Atlas Assault Rifle",
+    "BalanceId_AssaultRifle_Dahl_02": "Dahl Assault Rifle",
+    # Pistols
+    "BalanceId_Pistol_Hyperion_01": "Hyperion Pistol",
+    "BalanceId_Pistol_Tediore_02": "Tediore Sidearm",
+    # SMGs
+    "BalanceId_SMG_Maliwan_01": "Maliwan SMG",
+    "BalanceId_SMG_Hyperion_02": "Hyperion SMG",
+    # Shotguns
+    "BalanceId_Shotgun_Jakobs_01": "Jakobs Shotgun",
+    # Vehicles
+    "BalanceId_Vehicle_Hovercraft_01": "Hovercraft Skin",
+    # Skins
+    "BalanceId_Skin_Paladin_01": "Paladin Skin",
+}
+
+
+def _unlock_all_map_areas(save_dict):
+    """Best-effort: ensure world/map/areas/locations exist and set visited/discovered=True.
+    If empty, seed a minimal 'ALL' entry so users still see an unlock effect."""
+    try:
+        if not isinstance(save_dict, dict):
+            return 0
+        world = save_dict.setdefault("state", {}).setdefault("world", {})
+        m = world.setdefault("map", {})
+        areas = m.setdefault("areas", {})
+        locations = m.setdefault("locations", {})
+        touched = 0
+
+        def touch_container(container):
+            nonlocal touched
+            if isinstance(container, dict):
+                if not container:
+                    container["ALL"] = {"visited": True, "discovered": True}
+                    touched += 1
+                else:
+                    for k, v in list(container.items()):
+                        if not isinstance(v, dict):
+                            v = {}
+                        if not v.get("visited"):
+                            v["visited"] = True; touched += 1
+                        if not v.get("discovered"):
+                            v["discovered"] = True; touched += 1
+                        container[k] = v
+        touch_container(areas)
+        touch_container(locations)
+        return touched
+    except Exception as e:
+        print("Map unlock error:", e)
+        return 0
+
+
+def _apply_selected_class_104a(app):
+    """Writes the selected class into the save."""
+    try:
+        cls = None
+        if hasattr(app, "var_class_dd"):
+            cls = (app.var_class_dd.get() or "").strip()
+        if not cls and hasattr(app, "cf") and "Class" in app.cf:
+            try:
+                cls = app.cf["Class"].get().strip()
+            except Exception:
+                pass
+
+        norm = {
+            "ECHO4": "Echo4", "ECHO 4": "Echo4",
+            "DARKSIREN": "DarkSiren", "DARK SIREN": "DarkSiren",
+            "EXOSOLDIER": "ExoSoldier", "EXO SOLDIER": "ExoSoldier",
+            "GRAVITAR": "Gravitar",
+            "PALADIN": "Paladin",
+        }
+        if cls:
+            key = cls.upper().replace("-", " ").replace("_", " ")
+            cls_norm = norm.get(key, cls)
+            root = app.yaml_obj if hasattr(app, "yaml_obj") else (app._root() if hasattr(app,"_root") else {})
+            state = root.setdefault("state", {})
+            character = state.setdefault("character", {})
+            character["class"] = cls_norm
+            root.setdefault("character", {})["class"] = cls_norm
+            return True, cls_norm
+        return False, None
+    except Exception as e:
+        print("apply class failed:", e)
+        return False, None
+
 import time, zlib
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+# -- Weapon friendly-name mapping 
+WEAPON_NAMES = {
+    'd_t@': 'Jakobs Shotgun',
+    'bV{r': 'Jakobs Pistol',
+    'y3L+2}': 'Jakobs Sniper',
+    'eU_{': 'Maliwan Shotgun',
+    'w$Yw2}': 'Maliwan SMG',
+    'velk2}': 'Vladof AR',
+    'xFw!2}': 'Vladof SMG',
+    'xp/&2}': 'Ripper Sniper',
+    'ct)%': 'Torgue Pistol',
+    'fs(8': 'Daedalus AR',
+    'b)Kv': 'Order Pistol',
+    'y>^2}': 'Order Sniper',
+    'r$WBm': 'Jakobs Ordnance'
+}
+
+def _weapon_name_from_serial(serial: str) -> str:
+    if not serial or not serial.startswith('@Ug'):
+        return ''
+    for length in range(4, 10):
+        prefix = serial[3:3+length]
+        for code, name in WEAPON_NAMES.items():
+            if prefix.startswith(code):
+                return name
+    return ''
 
 import tkinter as tk
 from tkinter import filedialog as fd, messagebox as mb, ttk
@@ -53,6 +332,23 @@ EMBEDDED_PROFILE_UNLOCKS = {
         "Unlockable_Echo4.Skin42_Legacy",
         "Unlockable_Echo4.Skin50_BreakTheGame",
         "Unlockable_Echo4.Skin24_PreOrder",
+        "Unlockable_Echo4.Skin14_Fire",
+        "Unlockable_Echo4.attachment10_crown",
+        "Unlockable_Echo4.Body03_Ripper",
+        "Unlockable_Echo4.attachment07_horns",
+        "Unlockable_Echo4.Skin07_RedHanded",
+        "Unlockable_Echo4.Skin19_Dirty",
+        "Unlockable_Echo4.Skin45_BreakFree",
+        "Unlockable_Echo4.attachment08_tinfoilhat",
+        "Unlockable_Echo4.Skin09_Sewer",
+        "Unlockable_Echo4.Skin18_Electi",
+        "Unlockable_Echo4.Skin15_Survivalist",
+        "Unlockable_Echo4.Skin17_Auger",
+        "Unlockable_Echo4.Skin27_Space",
+        "Unlockable_Echo4.Body01_GeneVIV",
+        "Unlockable_Echo4.Skin12_Tediore",
+        "Unlockable_Echo4.Skin32_DuctTaped",
+        "Unlockable_Echo4.Skin16_Crimson",
     ],
     "unlockable_darksiren": [
         "Unlockable_DarkSiren.Head01_Prison",
@@ -79,6 +375,31 @@ EMBEDDED_PROFILE_UNLOCKS = {
         "Unlockable_DarkSiren.Head11_Ripper",
         "Unlockable_DarkSiren.Head12_Order",
         "Unlockable_DarkSiren.Head23_CrashTestDummy",
+        "Unlockable_DarkSiren.Skin24_PreOrder",
+        "Unlockable_DarkSiren.Body02_Premium",
+        "Unlockable_DarkSiren.Head16_Premium",
+        "Unlockable_DarkSiren.Skin44_Premium",
+        "Unlockable_DarkSiren.Skin10_Hawaiian",
+        "Unlockable_DarkSiren.Skin14_Fire",
+        "Unlockable_DarkSiren.Skin25_Slimed",
+        "Unlockable_DarkSiren.Skin26_Camo",
+        "Unlockable_DarkSiren.Skin34_Daedalus",
+        "Unlockable_DarkSiren.Skin45_BreakFree",
+        "Unlockable_DarkSiren.Head08_Survivalist",
+        "Unlockable_DarkSiren.Skin09_Sewer",
+        "Unlockable_DarkSiren.Head09_Electi",
+        "Unlockable_DarkSiren.Head15_CrimeLord",
+        "Unlockable_DarkSiren.Skin11_Astral",
+        "Unlockable_DarkSiren.Head10_Transhuman",
+        "Unlockable_DarkSiren.Skin18_Electi",
+        "Unlockable_DarkSiren.Skin13_3CatMoon",
+        "Unlockable_DarkSiren.Skin15_Survivalist",
+        "Unlockable_DarkSiren.Skin17_Auger",
+        "Unlockable_DarkSiren.Skin27_Space",
+        "Unlockable_DarkSiren.Head04_Shades",
+        "Unlockable_DarkSiren.Skin12_Tediore",
+        "Unlockable_DarkSiren.Head14_Thresher",
+        "Unlockable_DarkSiren.Skin16_Crimson",
     ],
     "unlockable_exosoldier": [
         "Unlockable_ExoSoldier.Head01_Prison",
@@ -105,6 +426,31 @@ EMBEDDED_PROFILE_UNLOCKS = {
         "Unlockable_ExoSoldier.Head11_Ripper",
         "Unlockable_ExoSoldier.Head12_Order",
         "Unlockable_ExoSoldier.Head23_CrushTestDummy",
+        "Unlockable_ExoSoldier.Skin24_PreOrder",
+        "Unlockable_ExoSoldier.Body02_Premium",
+        "Unlockable_ExoSoldier.Head16_Premium",
+        "Unlockable_ExoSoldier.Skin44_Premium",
+        "Unlockable_ExoSoldier.Skin10_Hawaiian",
+        "Unlockable_ExoSoldier.Skin14_Fire",
+        "Unlockable_ExoSoldier.Skin25_Slimed",
+        "Unlockable_ExoSoldier.Skin26_Camo",
+        "Unlockable_ExoSoldier.Skin34_Daedalus",
+        "Unlockable_ExoSoldier.Skin45_BreakFree",
+        "Unlockable_ExoSoldier.Head08_Survivalist",
+        "Unlockable_ExoSoldier.Skin09_Sewer",
+        "Unlockable_ExoSoldier.Head09_Electi",
+        "Unlockable_ExoSoldier.Head15_CrimeLord",
+        "Unlockable_ExoSoldier.Skin11_Astral",
+        "Unlockable_ExoSoldier.Head10_Transhuman",
+        "Unlockable_ExoSoldier.Skin18_Electi",
+        "Unlockable_ExoSoldier.Skin13_3CatMoon",
+        "Unlockable_ExoSoldier.Skin15_Survivalist",
+        "Unlockable_ExoSoldier.Skin17_Auger",
+        "Unlockable_ExoSoldier.Skin27_Space",
+        "Unlockable_ExoSoldier.Head05_LongHair",
+        "Unlockable_ExoSoldier.Skin12_Tediore",
+        "Unlockable_ExoSoldier.Head14_Thresher",
+        "Unlockable_ExoSoldier.Skin16_Crimson",
     ],
     "unlockable_gravitar": [
         "Unlockable_Gravitar.Head01_Prison",
@@ -131,6 +477,31 @@ EMBEDDED_PROFILE_UNLOCKS = {
         "Unlockable_Gravitar.Head11_Ripper",
         "Unlockable_Gravitar.Head12_Order",
         "Unlockable_Gravitar.Head23_CrushTestDummy",
+        "Unlockable_Gravitar.Skin24_PreOrder",
+        "Unlockable_Gravitar.Body02_Premium",
+        "Unlockable_Gravitar.Head16_Premium",
+        "Unlockable_Gravitar.Skin44_Premium",
+        "Unlockable_Gravitar.Skin10_Hawaiian",
+        "Unlockable_Gravitar.Skin14_Fire",
+        "Unlockable_Gravitar.Skin25_Slimed",
+        "Unlockable_Gravitar.Skin26_Camo",
+        "Unlockable_Gravitar.Skin34_Daedalus",
+        "Unlockable_Gravitar.Skin45_BreakFree",
+        "Unlockable_Gravitar.Head08_Survivalist",
+        "Unlockable_Gravitar.Skin09_Sewer",
+        "Unlockable_Gravitar.Head09_Electi",
+        "Unlockable_Gravitar.Head15_CrimeLord",
+        "Unlockable_Gravitar.Skin11_Astral",
+        "Unlockable_Gravitar.Head10_Transhuman",
+        "Unlockable_Gravitar.Skin18_Electi",
+        "Unlockable_Gravitar.Skin13_3CatMoon",
+        "Unlockable_Gravitar.Skin15_Survivalist",
+        "Unlockable_Gravitar.Skin17_Auger",
+        "Unlockable_Gravitar.Skin27_Space",
+        "Unlockable_Gravitar.Head06_RoundGlasses",
+        "Unlockable_Gravitar.Skin12_Tediore",
+        "Unlockable_Gravitar.Head14_Thresher",
+        "Unlockable_Gravitar.Skin16_Crimson",
     ],
     "unlockable_paladin": [
         "Unlockable_Paladin.Head01_Prison",
@@ -157,6 +528,31 @@ EMBEDDED_PROFILE_UNLOCKS = {
         "Unlockable_Paladin.Head11_Ripper",
         "Unlockable_Paladin.Head12_Order",
         "Unlockable_Paladin.Head23_CrushTestDummy",
+        "Unlockable_Paladin.Skin24_PreOrder",
+        "Unlockable_Paladin.Body02_Premium",
+        "Unlockable_Paladin.Head16_Premium",
+        "Unlockable_Paladin.Skin44_Premium",
+        "Unlockable_Paladin.Skin10_Hawaiian",
+        "Unlockable_Paladin.Skin14_Fire",
+        "Unlockable_Paladin.Skin25_Slimed",
+        "Unlockable_Paladin.Skin26_Camo",
+        "Unlockable_Paladin.Skin34_Daedalus",
+        "Unlockable_Paladin.Skin45_BreakFree",
+        "Unlockable_Paladin.Head08_Survivalist",
+        "Unlockable_Paladin.Skin09_Sewer",
+        "Unlockable_Paladin.Head09_Electi",
+        "Unlockable_Paladin.Head15_CrimeLord",
+        "Unlockable_Paladin.Skin11_Astral",
+        "Unlockable_Paladin.Head10_Transhuman",
+        "Unlockable_Paladin.Skin18_Electi",
+        "Unlockable_Paladin.Skin13_3CatMoon",
+        "Unlockable_Paladin.Skin15_Survivalist",
+        "Unlockable_Paladin.Skin17_Auger",
+        "Unlockable_Paladin.Skin27_Space",
+        "Unlockable_Paladin.Head05_Goth",
+        "Unlockable_Paladin.Skin12_Tediore",
+        "Unlockable_Paladin.Head14_Thresher",
+        "Unlockable_Paladin.Skin16_Crimson",
     ],
     "unlockable_weapons": [
         "Unlockable_Weapons.Mat13_Whiteout",
@@ -173,6 +569,31 @@ EMBEDDED_PROFILE_UNLOCKS = {
         "Unlockable_Weapons.shiny_plasmacoil",
         "Unlockable_Weapons.shiny_star_helix",
         "Unlockable_Weapons.shiny_anarchy",
+        "Unlockable_Weapons.Mat01_Synthwave",
+        "Unlockable_Weapons.Mat29_Cheers",
+        "Unlockable_Weapons.Mat17_DeadWood",
+        "Unlockable_Weapons.Mat25_LocustGas",
+        "Unlockable_Weapons.Mat26_AugerSight",
+        "Unlockable_Weapons.Mat27_GoldenPower",
+        "Unlockable_Weapons.shiny_leadballoon",
+        "Unlockable_Weapons.shiny_convergence",
+        "Unlockable_Weapons.shiny_boomslang",
+        "Unlockable_Weapons.Mat08_EchoBot",
+        "Unlockable_Weapons.shiny_luty",
+        "Unlockable_Weapons.shiny_rocketreload",
+        "Unlockable_Weapons.Mat06_ElectiSamurai",
+        "Unlockable_Weapons.shiny_noisycricket",
+        "Unlockable_Weapons.shiny_heavyturret",
+        "Unlockable_Weapons.shiny_kaoson",
+        "Unlockable_Weapons.Mat33_Creepy",
+        "Unlockable_Weapons.Mat34_MoneyCamo",
+        "Unlockable_Weapons.Mat30_CrimsonRaiders",
+        "Unlockable_Weapons.Mat32_ImperialGuard",
+        "Unlockable_Weapons.shiny_kaleidosplode",
+        "Unlockable_Weapons.shiny_slugger",
+        "Unlockable_Weapons.shiny_beegun",
+        "Unlockable_Weapons.shiny_kickballer",
+        "Unlockable_Weapons.shiny_vamoose",
     ],
     "unlockable_vehicles": [
         "Unlockable_Vehicles.Mat17_DeadWood",
@@ -192,11 +613,17 @@ EMBEDDED_PROFILE_UNLOCKS = {
         "Unlockable_Vehicles.Borg",
         "Unlockable_Vehicles.Mat27_GoldenPower",
         "Unlockable_Vehicles.Mat23_FutureProof",
+        "Unlockable_Vehicles.Mat34_MoneyCamo",
+        "Unlockable_Vehicles.Mat20_Cyberspace",
+        "Unlockable_Vehicles.Mat19_Meltdown",
+        "Unlockable_Vehicles.mat47_jakobsuncommon",
+        "Unlockable_Vehicles.Mat01_Synthwave",
+        "Unlockable_Vehicles.Mat32_ImperialGuard",
+        "Unlockable_Vehicles.Mat33_Creepy",
     ],
 }
 
 EMBEDDED_REWARD_PACKAGES = [
-    # Character Skins
     "RewardPackage_CharacterSkin_36_Torgue",
     "RewardPackage_CharacterSkin_26_MoneyCamo",
     "RewardPackage_CharacterSkin_03_Ghost",
@@ -206,12 +633,8 @@ EMBEDDED_REWARD_PACKAGES = [
     "RewardPackage_CharacterSkin_34_Daedalus",
     "RewardPackage_CharacterSkin_25_Slimed",
     "RewardPackage_CharacterSkin_40_Veil",
-
-    # Character Heads (known reward packages)
     "RewardPackage_CharacterHeads_06_UniqueE",
     "RewardPackage_CharacterHeads_07_UniqueF",
-
-    # Echo Skins
     "RewardPackage_EchoSkin_04_Tech",
     "RewardPackage_EchoSkin_33_Jakobs",
     "RewardPackage_EchoSkin_37_Maliwan",
@@ -232,14 +655,10 @@ EMBEDDED_REWARD_PACKAGES = [
     "RewardPackage_EchoSkin_40_Veil",
     "RewardPackage_EchoSkin_06_Amara",
     "RewardPackage_EchoSkin_36_Torgue",
-
-    # Echo Attachments
     "RewardPackage_EchoAttachment_10_Crown",
     "RewardPackage_EchoAttachment_04_Wings",
     "RewardPackage_EchoAttachment_03_Bolt",
     "RewardPackage_EchoAttachment_09_Goggles",
-
-    # Weapon Skins
     "RewardPackage_WeaponSkin_16_PolePosition",
     "RewardPackage_WeaponSkin_31_Splash",
     "RewardPackage_WeaponSkin_13_Whiteout",
@@ -247,8 +666,6 @@ EMBEDDED_REWARD_PACKAGES = [
     "RewardPackage_WeaponSkin_18_CrashTest",
     "RewardPackage_WeaponSkin_07_CuteCat",
     "RewardPackage_WeaponSkin_19_Meltdown",
-
-    # Vehicle skins / brand rewards
     "RewardPackage_VehicleSkin_17_DeadWood",
     "Reward_Vehicle_DarkSiren",
     "Reward_Vehicle_Grazer",
@@ -265,15 +682,62 @@ EMBEDDED_REWARD_PACKAGES = [
     "Reward_HoverDrive_Vladof_01",
     "Reward_HoverDrive_Vladof_02",
     "Reward_HoverDrive_Vladof_03",
-
-    # Bundles / meta rewards
     "RewardPackage_Combined_Propaganda",
     "RewardPackage_PreOrder",
     "RewardPackage_Premium",
     "RewardPackage_Headhunter",
     "RewardPackage_Legacy",
+    "ChallengeReward_Shiny_BeeGun",
+    "ChallengeReward_Shiny_Kickballer",
+    "ChallengeReward_Shiny_Vamoose",
+    "ChallengeReward_Shiny_anarchy",
+    "RewardPackage_CharacterSkin_19_Dirty",
+    "RewardPackage_CharacterSkin_30_Cute",
+    "RewardPackage_EchoAttachment_01_PartyHat",
+    "RewardPackage_EchoSkin_2_Order",
+    "RewardPackage_EchoSkin_3_Ghost",
+    "RewardPackage_GoldenEcho4",
+    "RewardPackage_SHiFT",
+    "RewardPackage_VehicleSkin_07_CuteCat",
+    "RewardPackage_VehicleSkin_10_Graffiti",
+    "RewardPackage_VehicleSkin_19_Meltdown",
+    "RewardPackage_VehicleSkin_42_Gratata",
+    "RewardPackage_WeaponSkin_20_Cyberspace",
+    "RewardPackage_WeaponSkin_21_Afterburn",
+    "RewardPackage_WeaponSkin_22_Overload",
+    "RewardPackage_WeaponSkin_23_FutureProof",
+    "Reward_HoverDrive_Borg_01",
+    "Reward_HoverDrive_Borg_02",
+    "Reward_HoverDrive_Borg_03",
+    "Reward_HoverDrive_Borg_04",
+    "Reward_HoverDrive_Borg_05",
+    "Reward_HoverDrive_Jakobs_03",
+    "Reward_HoverDrive_Jakobs_04",
+    "Reward_HoverDrive_Maliwan_05",
+    "Reward_HoverDrive_Order_01",
+    "Reward_HoverDrive_Order_02",
+    "Reward_HoverDrive_Order_03",
+    "Reward_HoverDrive_Order_04",
+    "Reward_HoverDrive_Order_05",
+    "Reward_HoverDrive_Tediore_01",
+    "Reward_HoverDrive_Tediore_02",
+    "Reward_HoverDrive_Tediore_03",
+    "Reward_HoverDrive_Tediore_04",
+    "Reward_HoverDrive_Tediore_05",
+    "Reward_HoverDrive_Torgue_01",
+    "Reward_HoverDrive_Torgue_02",
+    "Reward_HoverDrive_Torgue_03",
+    "Reward_HoverDrive_Torgue_04",
+    "Reward_HoverDrive_Torgue_05",
+    "Reward_HoverDrive_Vladof_04",
+    "Reward_HoverDrive_Vladof_05",
+    "Reward_Vehicle_Gravitar",
+    "pgraph.sdu_upgrades.Class_Mod_Slot",
+    "pgraph.sdu_upgrades.Enhancement_Slot",
+    "pgraph.sdu_upgrades.RepKit_Slot",
+    "pgraph.sdu_upgrades.Weapon_Slot_03",
+    "pgraph.sdu_upgrades.Weapon_Slot_04",
 ]
-
 
 # ── Optional deps ─────────────────────────────────────────────────────────────
 try:
@@ -284,7 +748,7 @@ except Exception:
 # ── Theme ─────────────────────────────────────────────────────────────────────
 class Dark:
     BG = "#0b0f12"       # slightly deeper
-    FG = "#e7eef2"
+    FG = "#dde1e4"
     ACC = "#141b22"
     HIL = "#0ea5b7"      # teal accent
     SEL = "#0b6a78"
@@ -572,6 +1036,50 @@ def _decode_equipment_d(b: bytes, serial: str)->DecodedItem:
     conf="high" if ('byte_5' in f and f['byte_5']==15) else "medium"
     return DecodedItem(serial,'d','equipment_alt',len(b),s,f,conf)
 
+
+# ---- Friendly naming helpers (coarse fallback when explicit map missing) ----
+_MANUFACTURER_MAP = {
+    11: "Jakobs", 12: "Maliwan", 13: "Tediore", 14: "Hyperion",
+    15: "Torgue", 16: "Vladof", 17: "Atlas", 18: "DAHL", 49: "UGe"
+}
+_ITEMCLASS_MAP = {
+    10: "Pistol", 11: "Shotgun", 12: "SMG", 13: "Assault Rifle",
+    14: "Sniper", 15: "Heavy", 16: "Shield", 17: "Grenade", 18: "Relic"
+}
+def _compact_tags(d: 'DecodedItem')->str:
+    bits = []
+    if hasattr(d, 'stats') and d.stats is not None:
+        if d.stats.rarity is not None: bits.append(f"rarity={d.stats.rarity}")
+        if d.stats.manufacturer is not None: bits.append(f"mfr={d.stats.manufacturer}")
+        if d.stats.item_class is not None: bits.append(f"class={d.stats.item_class}")
+    return " | ".join(bits) if bits else "—"
+
+
+def _friendly_from_decoded(d: 'DecodedItem')->str:
+    """Return the best human-friendly name we can compute.
+    Priority:
+      1) Known serial prefix → weapon name 
+      2) Manufacturer + ItemClass (when both available)
+      3) ItemClass only
+      4) Generic by item_type
+    """
+    try:
+        if hasattr(d, "serial"):
+            nm = _weapon_name_from_serial(d.serial)
+            if nm:
+                return nm
+    except Exception:
+        pass
+    # Fallbacks based on decoded stats maps
+    brand = _MANUFACTURER_MAP.get(getattr(getattr(d, 'stats', None), 'manufacturer', None), None)
+    kind = _ITEMCLASS_MAP.get(getattr(getattr(d, 'stats', None), 'item_class', None), None)
+    if brand and kind:
+        return f"{brand} {kind}"
+    if kind:
+        return kind
+    return {"r":"Weapon","e":"Equipment","d":"Equipment Alt","u":"Special","f":"Special","!":"Special"}.get(getattr(d,'item_type','?'), "Unknown")
+
+
 def decode_item_serial(serial: str)->DecodedItem:
     b=bit_pack_decode(serial)
     t = serial[3] if serial.startswith('@Ug') and len(serial)>=4 else '?'
@@ -781,6 +1289,41 @@ def sum_points_in_graphs(prog: Dict[str, Any], name_prefixes: Optional[List[str]
 
 # ── App ───────────────────────────────────────────────────────────────────────
 class App:
+
+    def apply_map_unlock_now(self):
+        """Unlock all map areas/locations safely and refresh UI."""
+        try:
+            # Resolve the same YAML root used elsewhere
+            root = getattr(self, 'yaml_obj', None)
+            if root is None and hasattr(self, '_root'):
+                r = self._root()
+                root = r if isinstance(r, dict) else {}
+            touched = _unlock_all_map_areas(root if isinstance(root, dict) else {})
+            # Refresh YAML view
+            try:
+                import yaml as _yaml
+                if hasattr(self, 'yaml_text') and hasattr(self, 'yaml_obj'):
+                    self.yaml_text.delete("1.0", "end")
+                    self.yaml_text.insert("1.0", _yaml.safe_dump(self.yaml_obj, sort_keys=False, allow_unicode=True))
+            except Exception:
+                pass
+            # Refresh items list
+            try:
+                if hasattr(self, 'refresh_items'):
+                    self.refresh_items()
+            except Exception:
+                pass
+            try:
+                self.log(f"Map unlock: set visited/discovered on {touched} entries")
+            except Exception:
+                pass
+        except Exception as e:
+            try:
+                from tkinter import messagebox as _mb
+                _mb.showerror("Map Unlock", f"Failed to unlock map: {e}")
+            except Exception:
+                pass
+
     def _normalize_unlock_variants(self, entry: str):
         """Return case-flex variants used for case-sensitive unlockables."""
         e = str(entry)
@@ -823,7 +1366,7 @@ class App:
         return list(out)
 
     def __init__(self, root: tk.Tk):
-        self.root = root; self.root.title("BL4 Unified Save Editor — v1.033a"); self.root.geometry("1340x900")
+        self.root = root; self.root.title("BL4 Save Editor v1.04a Full"); self.root.geometry("1340x900")
         apply_dark(root)
 
         self.user_id = tk.StringVar()
@@ -994,7 +1537,7 @@ class App:
             self.yaml_text.delete("1.0","end"); self.yaml_text.insert("1.0", text)
             try: self.yaml_obj=yaml.load(text, Loader=get_yaml_loader())
             except Exception as e: self.yaml_obj=None; self.log(f"YAML note: {e}")
-            self.refresh_character(); self.refresh_items(); self.refresh_progression()
+            self.refresh_character(); self.refresh_items(); ns=_load_embedded_decoder(); self.log('Decoder present: ' + str('decode_item_serial' in ns)); self.refresh_progression()
             root_obj=self._root(); root_used="/state" if (isinstance(self.yaml_obj,dict) and root_obj is self.yaml_obj.get("state")) else "/"
             self.log(f"Character root resolved at: {root_used}")
             self.log(f"Detected platform: {plat}"); self.log(f"Backup created: {backup.name}"); self.log(f"Decrypted → {self.yaml_path.name}")
@@ -1046,6 +1589,26 @@ class App:
             self.log(f"Unlock error: {e}")
 
     def encrypt(self):
+
+        # Auto-apply map unlock if requested
+
+        if getattr(self, 'var_unlock_map', None) and self.var_unlock_map.get():
+
+            try:
+
+                _unlock_all_map_areas(self.yaml_obj if hasattr(self,"yaml_obj") else (self._root() if hasattr(self,"_root") else {}))
+
+            except Exception as __e:
+
+                print('map apply hook error:', __e)
+
+        # Apply chosen class on action
+        try:
+            _apply_selected_class_104a(self)
+        except Exception as __e:
+            print("class apply hook error:", __e)
+
+
         if not self.yaml_path: return mb.showwarning("No YAML","Decrypt first")
         if yaml is None:
             return mb.showerror("Missing dependency","PyYAML is required.\nInstall with: pip install pyyaml")
@@ -1095,7 +1658,12 @@ class App:
             self.cf[label]=v
         ttk.Button(grid,text="Apply Character",command=self.apply_character).grid(row=0,column=2,rowspan=2,padx=12)
         # Cosmetic Unlocks (no external files needed)
-        opts = ttk.LabelFrame(parent, text="Cosmetic Unlocks", padding=8)
+        opts = ttk.LabelFrame(parent, text="Unlock Rewards (Class)", padding=8)
+        # Map unlock controls (injected)
+        self.var_unlock_map = getattr(self, 'var_unlock_map', tk.BooleanVar(value=False))
+        ttk.Checkbutton(opts, text="Unlock Map (100% visited + discovered)", variable=self.var_unlock_map).pack(anchor="w", padx=6, pady=2)
+        ttk.Button(opts, text="Apply Map Unlock Now", command=self.apply_map_unlock_now).pack(anchor="w", padx=6, pady=2)
+
         opts.pack(fill="x", padx=10, pady=6)
         self.unlock_all_cosmetics_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(opts, text="Unlock Cosmetics (RewardPackages)", variable=self.unlock_all_cosmetics_var).pack(anchor="w")
@@ -1122,6 +1690,26 @@ class App:
                 self.cf[label].set("")
 
     def apply_character(self):
+
+        # Auto-apply map unlock if requested
+
+        if getattr(self, 'var_unlock_map', None) and self.var_unlock_map.get():
+
+            try:
+
+                _unlock_all_map_areas(self.yaml_obj if hasattr(self,"yaml_obj") else (self._root() if hasattr(self,"_root") else {}))
+
+            except Exception as __e:
+
+                print('map apply hook error:', __e)
+
+        # Apply chosen class on action
+        try:
+            _apply_selected_class_104a(self)
+        except Exception as __e:
+            print("class apply hook error:", __e)
+
+
         r=self._root()
         if not isinstance(r, dict): return
         r["class"]=self.cf["Class"].get()
@@ -1295,39 +1883,54 @@ class App:
         ttk.Button(filt,text="Filter",command=self.apply_filter).pack(side="left",padx=6)
         ttk.Button(filt,text="Export Decoded → YAML",command=self.export_decoded_yaml).pack(side="left",padx=12)
 
-        cols=("path","type","code","serial")
+        cols=("path","type","name","code","serial","tags")
         self.tree=ttk.Treeview(parent,columns=cols,show="headings")
-        for c,txt,w in [("path","Path",520),("type","Type",140),("code","Code",80),("serial","Serial",540)]:
+        for c,txt,w in [("path","Path",420),("type","Type",120),("name","Name",220),("code","Code",80),("serial","Serial",480),("tags","Tags",180)]:
             self.tree.heading(c,text=txt); self.tree.column(c,width=w,anchor="w")
         self.tree.pack(expand=True,fill="both", padx=8, pady=(0,8))
         self.tree.bind("<Double-1>", self.open_inspector)
 
     def refresh_items(self)->None:
-        self.items=[]
-        r=self._root()
-        if not isinstance(r, dict): return
-        for path,serial in walk_ug(r):
-            t = serial[3] if serial.startswith("@Ug") and len(serial)>=4 else "?"
-            friendly = {"r":"Weapon","e":"Equipment","d":"Equipment Alt","w":"Special","u":"Special","f":"Special","!":"Special"}.get(t,"Unknown")
-            code = serial[:4] if serial.startswith("@Ug") and len(serial)>=4 else "@Ug?"
-            self.items.append((path,friendly,code,serial))
+
+        # Build 6-tuples for the items table: (path, type, name, code, serial, tags)
+        self.items = []
+        r = self._root()
+        if not isinstance(r, dict):
+            return
+        for path, serial in walk_ug(r):
+            # Type from @Ug? prefix
+            t = serial[3] if serial.startswith("@Ug") and len(serial) >= 4 else "?"
+            dtype = {"r":"Weapon","e":"Equipment","d":"Equipment Alt","u":"Special","f":"Special","!":"Special"}.get(t,"Unknown")
+            # Compact code
+            code4 = serial[:4] if serial.startswith("@Ug") and len(serial) >= 4 else "@Ug?"
+            # Friendly name + tags via decoder (best-effort)
+            try:
+                dec = decode_item_serial(serial)
+                name = _friendly_from_decoded(dec)
+                tags = _compact_tags(dec)
+            except Exception:
+                name = ""
+                tags = ""
+            self.items.append((path, dtype, name, code4, serial, tags))
         self.apply_filter()
+
 
     def apply_filter(self)->None:
         term=(self.search_var.get() or "").lower(); type_sel=self.type_var.get()
         for r in self.tree.get_children(): self.tree.delete(r)
-        for p,friendly,code,serial in self.items:
-            if type_sel!="All" and friendly!=type_sel: continue
-            if term and term not in p.lower() and term not in serial.lower(): continue
-            self.tree.insert("", "end", values=(p,friendly,code,serial))
+        for p,dtype,name,code,serial,tags in self.items:
+            if type_sel!="All" and dtype!=type_sel: continue
+            if term and not any(term in s for s in (p.lower(), serial.lower(), str(name).lower())):
+                continue
+            self.tree.insert("", "end", values=(p,dtype,name,code,serial,tags))
 
     def open_inspector(self,_evt=None)->None:
         sel=self.tree.selection()
         if not sel: return
-        p,friendly,code,serial=self.tree.item(sel[0],"values")
+        p,dtype,name,code,serial,tags = _safe_unpack_item_values(self.tree.item(sel[0],"values"))
         toks=tokens(p); d=decode_item_serial(serial)
         b=bytearray(bit_pack_decode(serial))
-        top=tk.Toplevel(self.root); top.title("Item Inspector"); top.geometry("880x620"); top.configure(bg=Dark.BG)
+        top=tk.Toplevel(self.root); top.title("BL4 Save Editor v1.04a Full"); top.geometry("880x620"); top.configure(bg=Dark.BG)
         nb=ttk.Notebook(top); nb.pack(expand=True,fill="both")
 
         # Simple
@@ -1346,6 +1949,9 @@ class App:
             ttk.Label(grid,text=name).grid(row=row,column=0,sticky="w",padx=6,pady=6)
             var=tk.StringVar(value=str(vals[name])); ttk.Entry(grid,textvariable=var,width=16).grid(row=row,column=1,sticky="w",padx=6,pady=6)
             entries[name]=var; row+=1
+        ttk.Label(grid,text="Tags").grid(row=row,column=0,sticky="w",padx=6,pady=6)
+        ttk.Label(grid,text=str(tags)).grid(row=row,column=1,sticky="w",padx=6,pady=6)
+        row+=1
         def save_simple():
             try:
                 d.stats.primary_stat=int(entries["Primary"].get())
@@ -1356,7 +1962,11 @@ class App:
                 d.stats.level=int(entries["Level"].get())
             except ValueError:
                 return mb.showerror("Invalid input","All fields must be integers")
-            new_serial=encode_item_serial(d); set_by(self.yaml_obj if self._root() is self.yaml_obj else self._root(),toks,new_serial)
+            new_serial = encode_item_serial(d)
+
+            root = self.yaml_obj if self._root() is self.yaml_obj else self._root()
+
+            set_by(root, toks, new_serial)
             # reflect
             self.yaml_text.delete("1.0","end"); self.yaml_text.insert("1.0", yaml.safe_dump(self.yaml_obj, sort_keys=False, allow_unicode=True))
             self.refresh_items(); self.log(f"Updated {p}"); top.destroy()
@@ -1375,25 +1985,62 @@ class App:
             ttk.Label(frame,text=k).grid(row=r_,column=0,sticky="w",padx=6,pady=3)
             v=tk.StringVar(value=str(raw[k])); ttk.Entry(frame,textvariable=v,width=24).grid(row=r_,column=1,sticky="w",padx=6,pady=3)
             ents[k]=v; r_+=1
+        
         def save_raw():
-            bb=bytearray(b)
-            try: amap={k:int(v.get()) for k,v in ents.items() if v.get().strip()!=""}
-            except ValueError: return mb.showerror("Invalid","All raw values must be integers")
-            # Apply common raw edits onto buffer
-            for k,val in amap.items():
+            bb = bytearray(b)
+            # Build numeric-only map
+            amap = {}
+            cleaned = False
+            for k, v in ents.items():
+                s = (v.get() or "").strip()
+                if not s:
+                    continue
+                if k.startswith("val16_at_") or k.startswith("byte_") or k in ("header_le", "field2_le"):
+                    val = None
+                    sval = s.lower()
+                    try:
+                        if sval.startswith("0x"):
+                            val = int(sval, 16)
+                        else:
+                            digits = "".join(ch for ch in s if ch in "-0123456789")
+                            if digits not in ("", "-"):
+                                val = int(digits)
+                    except Exception:
+                        val = None
+                    if val is None:
+                        cleaned = True
+                        continue
+                    amap[k] = val
+                else:
+                    cleaned = True  # ignore non-numeric fields
+            # Apply edits
+            for k, val in amap.items():
                 if k.startswith("val16_at_"):
-                    off=int(k.split("_")[-1])
-                    if 0<=off<=len(bb)-2: bb[off:off+2]=int(val).to_bytes(2,"little")
-                elif k=="header_le" and len(bb)>=8: bb[0:8]=int(val).to_bytes(8,"little")
-                elif k=="field2_le" and len(bb)>=8: bb[4:8]=int(val).to_bytes(4,"little")
+                    off = int(k.split("_")[-1])
+                    if 0 <= off <= len(bb) - 2:
+                        bb[off:off+2] = int(val).to_bytes(2, "little")
+                elif k == "header_le" and len(bb) >= 8:
+                    try:
+                        bb[0:4] = int(val).to_bytes(4, "little")
+                    except Exception:
+                        pass
+                elif k == "field2_le" and len(bb) >= 8:
+                    bb[4:8] = int(val).to_bytes(4, "little")
                 elif k.startswith("byte_"):
-                    idx=int(k.split("_")[-1])
-                    if 0<=idx<len(bb): bb[idx]=int(val)&0xFF
-            prefix=f"@Ug{d.item_type}"
-            new_serial=bit_pack_encode(bytes(bb), prefix)
-            set_by(self.yaml_obj if self._root() is self.yaml_obj else self._root(),toks,new_serial)
-            self.yaml_text.delete("1.0","end"); self.yaml_text.insert("1.0", yaml.safe_dump(self.yaml_obj, sort_keys=False, allow_unicode=True))
-            self.refresh_items(); self.log(f"Updated (raw) {p}"); top.destroy()
+                    idx = int(k.split("_")[-1])
+                    if 0 <= idx < len(bb):
+                        bb[idx] = int(val) & 0xFF
+            prefix = f"@Ug{d.item_type}"
+            new_serial = bit_pack_encode(bytes(bb), prefix)
+            set_by(self.yaml_obj if self._root() is self.yaml_obj else self._root(), toks, new_serial)
+            self.yaml_text.delete("1.0", "end")
+            self.yaml_text.insert("1.0", yaml.safe_dump(self.yaml_obj, sort_keys=False, allow_unicode=True))
+            self.refresh_items()
+            if cleaned:
+                self.log(f"Updated (raw) {p} (ignored non-numeric or invalid fields)")
+            else:
+                self.log(f"Updated (raw) {p}")
+            top.destroy()
         ttk.Button(rawtab,text="Save Raw Changes",command=save_raw).pack(anchor="e",padx=10,pady=10)
 
     def export_decoded_yaml(self):
@@ -1413,10 +2060,53 @@ class App:
     # YAML tab
     def _build_tab_yaml(self,parent: ttk.Frame)->None:
         ytop=ttk.Frame(parent); ytop.pack(fill="x")
+        def _yaml_cmd_open():
+            fn = getattr(self, '_open_yaml_file', None)
+            if callable(fn):
+                return fn()
+            from tkinter import filedialog as fd, messagebox as mb
+            from pathlib import Path as _Path
+            f = fd.askopenfilename(title='Open YAML', filetypes=[('YAML','*.yml *.yaml'),('All files','*.*')])
+            if not f:
+                return
+            t = _Path(f).read_text(encoding='utf-8', errors='ignore')
+            if getattr(self, 'yaml_text', None):
+                self.yaml_text.delete('1.0','end')
+                self.yaml_text.insert('1.0', t)
+            try:
+                self.yaml_obj = yaml.load(t, Loader=get_yaml_loader()) if yaml is not None else None
+            except Exception as e:
+                self.log(f'YAML parse note: {e}')
+        def _yaml_cmd_encrypt():
+            fn = getattr(self, '_encrypt_yaml_as_save', None)
+            if callable(fn):
+                return fn()
+            from tkinter import filedialog as fd, messagebox as mb
+            from pathlib import Path as _Path
+            if yaml is None:
+                return mb.showerror('Missing dependency','PyYAML is required.\nInstall with: pip install pyyaml')
+            uid = (self.user_id.get() or '').strip() if hasattr(self,'user_id') else ''
+            if not uid:
+                return mb.showerror('Missing User ID','Enter your User ID first.')
+            txt = self.yaml_text.get('1.0','end') if getattr(self,'yaml_text',None) else ''
+            obj = yaml.load(txt, Loader=get_yaml_loader())
+            obj = extract_and_encode_serials_from_yaml(obj)
+            yb = yaml.safe_dump(obj, sort_keys=False, allow_unicode=True).encode()
+            dest = fd.asksaveasfilename(defaultextension='.sav', filetypes=[('BL4 Save','.sav')])
+            if not dest:
+                return
+            plat = (getattr(self, 'platform', None) or 'epic').lower()
+            _Path(dest).write_bytes(encrypt_from_yaml(yb, plat, uid))
+            try:
+                mb.showinfo('Done', f'Saved {dest}')
+            except Exception:
+                pass
         ttk.Label(ytop,text="Find:").pack(side="left")
         self.find_var=tk.StringVar(); ttk.Entry(ytop,textvariable=self.find_var,width=40).pack(side="left",padx=6)
         ttk.Button(ytop,text="Next",command=self.find_next).pack(side="left")
         ttk.Separator(ytop, orient="vertical").pack(side="left", fill="y", padx=8)
+        ttk.Button(ytop, text="Open YAML…", command=_yaml_cmd_open).pack(side="left", padx=6)
+        ttk.Button(ytop, text="Encrypt YAML → .sav", command=_yaml_cmd_encrypt).pack(side="left", padx=6)
         ttk.Checkbutton(ytop, text="Unlocks (Profile.sav)", variable=self.unlock_profile_var).pack(side="left", padx=6)
         self.yaml_text = tk.Text(parent, bg=Dark.BG, fg=Dark.FG, insertbackground=Dark.FG, selectbackground=Dark.SEL)
         self.yaml_text.pack(expand=True, fill="both")
@@ -1511,6 +2201,7 @@ class App:
         per_cat_added = []
         caseflex_cats = {"unlockable_echo4","unlockable_darksiren","unlockable_paladin",
                          "unlockable_gravitar","unlockable_exosoldier","unlockable_weapons"}
+                                            
 
         for cat_key, entries in (catalog.items() if isinstance(catalog, dict) else []):
             try:
@@ -1720,10 +2411,76 @@ if not hasattr(App, "dump_yaml"):
 
 # ======================== end v1.031a patches ========================
 
+#if __name__ == "__main__":
+
+# DEBUG launcher additions (non-invasive)
 if __name__ == "__main__":
-    root = tk.Tk()
-    App(root)
-    root.mainloop()
+    # DEBUG launcher additions (non-invasive)
+    import sys, traceback, atexit
+    DEBUG = ("--debug" in sys.argv) or ("-d" in sys.argv)
+
+    def _bl4_excepthook(exc_type, exc, tb):
+        msg = "".join(traceback.format_exception(exc_type, exc, tb))
+        try:
+            with open("startup_error.log", "w", encoding="utf-8") as f:
+                f.write(msg)
+        except Exception:
+            pass
+        try:
+            import tkinter.messagebox as _mb
+            _mb.showerror("Startup error", msg)
+        except Exception:
+            pass
+        if DEBUG:
+            try:
+                input("Press Enter to close...")
+            except Exception:
+                pass
+        sys.__excepthook__(exc_type, exc, tb)
+
+    sys.excepthook = _bl4_excepthook
+
+
+    import sys, traceback
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+        # Build the Tk root and pass it to App
+        root = tk.Tk()
+        try:
+            app = App(root)   # your App expects 'root'
+        except TypeError:
+            # Fallback if your App signature doesn't need root
+            app = App()
+
+        # Prefer an app.run() if you have one; otherwise mainloop via the instance/root
+        if hasattr(app, "run") and callable(getattr(app, "run")):
+            app.run()
+        elif hasattr(app, "root"):
+            app.root.mainloop()
+        else:
+            root.mainloop()
+
+    except Exception:
+        # Never exit silently—show, log, and print the real error
+        tb = traceback.format_exc()
+        try:
+            from tkinter import messagebox as _mb
+            _mb.showerror("Startup error", tb)
+        except Exception:
+            pass
+        try:
+            with open("startup_error.log", "w", encoding="utf-8") as _f:
+                _f.write(tb)
+        except Exception:
+            pass
+        print(tb)
+        if "--debug" in sys.argv:
+            try:
+                input("Press Enter to close...")
+            except Exception:
+                pass
+
  
 
 
@@ -1779,8 +2536,9 @@ def _patched_apply_filter(self)->None:
     term=(self.search_var.get() or "").lower(); type_sel=self.type_var.get()
     for r in self.tree.get_children(): self.tree.delete(r)
     for p,friendly,lvl,rar,fl,serial in self.items:
-        if type_sel!="All" and friendly!=type_sel: continue
-        if term and term not in p.lower() and term not in serial.lower(): continue
+        if type_sel!="All" and dtype!=type_sel: continue
+        if term and not any(term in s for s in (p.lower(), serial.lower(), str(name).lower())):
+                continue
         self.tree.insert("", "end", values=(p,friendly,lvl,rar,fl,serial))
 
 # 2) Patch inspector to add Equipped + State Flags selection and write siblings
@@ -1797,9 +2555,9 @@ STATE_FLAG_LABELS = [
 def _patched_open_inspector(self,_evt=None)->None:
     sel=self.tree.selection()
     if not sel: return
-    p,friendly,_,_,_,serial=self.tree.item(sel[0],"values")
+    p,typ,name,code,serial,tags = _safe_unpack_item_values(self.tree.item(sel[0],"values"))
     toks=tokens(p); d=decode_item_serial(serial)
-    top=tk.Toplevel(self.root); top.title("Item Inspector"); top.geometry("900x640"); top.configure(bg=Dark.BG)
+    top=tk.Toplevel(self.root); top.title("BL4 Save Editor v1.04a Full"); top.geometry("900x640"); top.configure(bg=Dark.BG)
     nb=ttk.Notebook(top); nb.pack(expand=True,fill="both")
 
     # Simple
@@ -1837,7 +2595,11 @@ def _patched_open_inspector(self,_evt=None)->None:
             d.stats.level=int(entries["Level"].get())
         except ValueError:
             return mb.showerror("Invalid input","All fields must be integers")
-        new_serial=encode_item_serial(d); set_by(self.yaml_obj if self._root() is self.yaml_obj else self._root(),toks,new_serial)
+        new_serial = encode_item_serial(d)
+
+        root = self.yaml_obj if self._root() is self.yaml_obj else self._root()
+
+        set_by(root, toks, new_serial)
         # write sibling flags
         try:
             parent=self.yaml_obj if self._root() is self.yaml_obj else self._root()
@@ -1939,3 +2701,1403 @@ App._build_tab_progression = _patched_build_tab_progression
 App.apply_progression_actions = apply_progression_actions
 App.recalc_pools = _patched_recalc_pools
 # ======================== v1.032a patch ends here ==========================
+
+
+
+# ==========================================================
+# 1.034a Patch Additions
+# ==========================================================
+
+AVAILABLE_CLASSES_1034A = [
+    "Char_DarkSiren","Char_Paladin","Char_Gravitar","Char_ExoSoldier",
+]
+
+# Catalog used by 1.04a. If you want to resolve from EMBEDDED_PROFILE_UNLOCKS at runtime,
+# you can fill these "entries" later; for now keep it syntactically valid.
+PROFILE_UNLOCKS_1034A = {
+    "unlockable_darksiren": {"entries": []},
+    "unlockable_exosoldier": {"entries": []},
+    "unlockable_gravitar": {"entries": []},
+    "unlockable_paladin": {"entries": []},
+    "unlockable_echo4": {"entries": []},
+    "unlockable_weapons": {"entries": []},
+    "unlockable_vehicles": {"entries": []},
+}
+
+
+
+# === BEGIN: auto-extended unlocks from reference profile ===
+
+PROFILE_UNLOCKS_1034A.setdefault('unlockable_darksiren', [])
+PROFILE_UNLOCKS_1034A['unlockable_darksiren'] = sorted(set(PROFILE_UNLOCKS_1034A['unlockable_darksiren']) | {
+    "Unlockable_DarkSiren.Body01_Prison",
+    "Unlockable_DarkSiren.Body02_Premium",
+    "Unlockable_DarkSiren.Head01_Prison",
+    "Unlockable_DarkSiren.Head02_PigTails",
+    "Unlockable_DarkSiren.Head03_MoHawk",
+    "Unlockable_DarkSiren.Head04_Shades",
+    "Unlockable_DarkSiren.Head05_BikeHelmet",
+    "Unlockable_DarkSiren.Head06_PunkMask",
+    "Unlockable_DarkSiren.Head07_Demon",
+    "Unlockable_DarkSiren.Head08_Survivalist",
+    "Unlockable_DarkSiren.Head09_Electi",
+    "Unlockable_DarkSiren.Head10_Transhuman",
+    "Unlockable_DarkSiren.Head11_Ripper",
+    "Unlockable_DarkSiren.Head12_Order",
+    "Unlockable_DarkSiren.Head13_Robot",
+    "Unlockable_DarkSiren.Head14_Thresher",
+    "Unlockable_DarkSiren.Head15_CrimeLord",
+    "Unlockable_DarkSiren.Head16_Premium",
+    "Unlockable_DarkSiren.Head23_CrashTestDummy",
+    "Unlockable_DarkSiren.Skin01_Prison",
+    "Unlockable_DarkSiren.Skin02_Order",
+    "Unlockable_DarkSiren.Skin03_Ghost",
+    "Unlockable_DarkSiren.Skin04_Tech",
+    "Unlockable_DarkSiren.Skin05_Ripper",
+    "Unlockable_DarkSiren.Skin06_Amara",
+    "Unlockable_DarkSiren.Skin07_RedHanded",
+    "Unlockable_DarkSiren.Skin08_Corrupted",
+    "Unlockable_DarkSiren.Skin09_Sewer",
+    "Unlockable_DarkSiren.Skin10_Hawaiian",
+    "Unlockable_DarkSiren.Skin11_Astral",
+    "Unlockable_DarkSiren.Skin12_Tediore",
+    "Unlockable_DarkSiren.Skin13_3CatMoon",
+    "Unlockable_DarkSiren.Skin14_Fire",
+    "Unlockable_DarkSiren.Skin15_Survivalist",
+    "Unlockable_DarkSiren.Skin16_Crimson",
+    "Unlockable_DarkSiren.Skin17_Auger",
+    "Unlockable_DarkSiren.Skin18_Electi",
+    "Unlockable_DarkSiren.Skin19_Dirty",
+    "Unlockable_DarkSiren.Skin20_HighRoller",
+    "Unlockable_DarkSiren.Skin21_Graffiti",
+    "Unlockable_DarkSiren.Skin22_Knitted",
+    "Unlockable_DarkSiren.Skin23_GearboxDev",
+    "Unlockable_DarkSiren.Skin24_PreOrder",
+    "Unlockable_DarkSiren.Skin25_Slimed",
+    "Unlockable_DarkSiren.Skin26_Camo",
+    "Unlockable_DarkSiren.Skin27_Space",
+    "Unlockable_DarkSiren.Skin28_Ritual",
+    "Unlockable_DarkSiren.Skin29_Guardian",
+    "Unlockable_DarkSiren.Skin30_Cute",
+    "Unlockable_DarkSiren.Skin31_Koto",
+    "Unlockable_DarkSiren.Skin32_DuctTaped",
+    "Unlockable_DarkSiren.Skin33_Jakobs",
+    "Unlockable_DarkSiren.Skin34_Daedalus",
+    "Unlockable_DarkSiren.Skin35_Vladof",
+    "Unlockable_DarkSiren.Skin36_Torgue",
+    "Unlockable_DarkSiren.Skin37_Maliwan",
+    "Unlockable_DarkSiren.Skin38_CyberPop",
+    "Unlockable_DarkSiren.Skin39_Critters",
+    "Unlockable_DarkSiren.Skin40_Veil",
+    "Unlockable_DarkSiren.Skin44_Premium",
+    "Unlockable_DarkSiren.Skin45_BreakFree",
+    "unlockable_darksiren",
+})
+
+PROFILE_UNLOCKS_1034A.setdefault('unlockable_echo4', [])
+PROFILE_UNLOCKS_1034A['unlockable_echo4'] = sorted(set(PROFILE_UNLOCKS_1034A['unlockable_echo4']) | {
+    "Unlockable_Echo4.Body01_GeneVIV",
+    "Unlockable_Echo4.Body03_Ripper",
+    "Unlockable_Echo4.Skin01_Prison",
+    "Unlockable_Echo4.Skin02_Order",
+    "Unlockable_Echo4.Skin03_Ghost",
+    "Unlockable_Echo4.Skin04_Tech",
+    "Unlockable_Echo4.Skin05_Ripper",
+    "Unlockable_Echo4.Skin06_Amara",
+    "Unlockable_Echo4.Skin07_RedHanded",
+    "Unlockable_Echo4.Skin08_Corrupted",
+    "Unlockable_Echo4.Skin09_Sewer",
+    "Unlockable_Echo4.Skin10_Hawaiian",
+    "Unlockable_Echo4.Skin11_Astral",
+    "Unlockable_Echo4.Skin12_Tediore",
+    "Unlockable_Echo4.Skin13_3CatMoon",
+    "Unlockable_Echo4.Skin14_Fire",
+    "Unlockable_Echo4.Skin15_Survivalist",
+    "Unlockable_Echo4.Skin16_Crimson",
+    "Unlockable_Echo4.Skin17_Auger",
+    "Unlockable_Echo4.Skin18_Electi",
+    "Unlockable_Echo4.Skin19_Dirty",
+    "Unlockable_Echo4.Skin20_HighRoller",
+    "Unlockable_Echo4.Skin21_Graffiti",
+    "Unlockable_Echo4.Skin22_Knitted",
+    "Unlockable_Echo4.Skin23_GearboxDev",
+    "Unlockable_Echo4.Skin24_PreOrder",
+    "Unlockable_Echo4.Skin25_Slimed",
+    "Unlockable_Echo4.Skin26_Camo",
+    "Unlockable_Echo4.Skin27_Space",
+    "Unlockable_Echo4.Skin28_Ritual",
+    "Unlockable_Echo4.Skin29_Guardian",
+    "Unlockable_Echo4.Skin30_Cute",
+    "Unlockable_Echo4.Skin31_Koto",
+    "Unlockable_Echo4.Skin32_DuctTaped",
+    "Unlockable_Echo4.Skin33_Jakobs",
+    "Unlockable_Echo4.Skin34_Daedalus",
+    "Unlockable_Echo4.Skin35_Vladof",
+    "Unlockable_Echo4.Skin36_Torgue",
+    "Unlockable_Echo4.Skin37_Maliwan",
+    "Unlockable_Echo4.Skin38_CyberPop",
+    "Unlockable_Echo4.Skin39_Critters",
+    "Unlockable_Echo4.Skin40_Veil",
+    "Unlockable_Echo4.Skin41_Butterfinger",
+    "Unlockable_Echo4.Skin42_Legacy",
+    "Unlockable_Echo4.Skin43_Twitch",
+    "Unlockable_Echo4.Skin45_BreakFree",
+    "Unlockable_Echo4.Skin50_BreakTheGame",
+    "Unlockable_Echo4.attachment01_partyhat",
+    "Unlockable_Echo4.attachment02_bow",
+    "Unlockable_Echo4.attachment03_bolt",
+    "Unlockable_Echo4.attachment04_wings",
+    "Unlockable_Echo4.attachment05_skull",
+    "Unlockable_Echo4.attachment06_crystalhorn",
+    "Unlockable_Echo4.attachment07_horns",
+    "Unlockable_Echo4.attachment08_tinfoilhat",
+    "Unlockable_Echo4.attachment09_goggles",
+    "Unlockable_Echo4.attachment10_crown",
+    "Unlockable_Echo4.attachment11_mohawk",
+    "Unlockable_Echo4.attachment12_psychomask",
+    "Unlockable_Echo4.attachment13_fishinghat",
+    "Unlockable_Echo4.body02_order",
+    "unlockable_echo4",
+})
+
+PROFILE_UNLOCKS_1034A.setdefault('unlockable_exosoldier', [])
+PROFILE_UNLOCKS_1034A['unlockable_exosoldier'] = sorted(set(PROFILE_UNLOCKS_1034A['unlockable_exosoldier']) | {
+    "Unlockable_ExoSoldier.Body01_Prison",
+    "Unlockable_ExoSoldier.Body02_Premium",
+    "Unlockable_ExoSoldier.Head01_Prison",
+    "Unlockable_ExoSoldier.Head02_Mullet",
+    "Unlockable_ExoSoldier.Head03_Guerilla",
+    "Unlockable_ExoSoldier.Head04_TechHawk",
+    "Unlockable_ExoSoldier.Head05_LongHair",
+    "Unlockable_ExoSoldier.Head06_BlindFold",
+    "Unlockable_ExoSoldier.Head07_Helm",
+    "Unlockable_ExoSoldier.Head08_Survivalist",
+    "Unlockable_ExoSoldier.Head09_Electi",
+    "Unlockable_ExoSoldier.Head10_Transhuman",
+    "Unlockable_ExoSoldier.Head11_Ripper",
+    "Unlockable_ExoSoldier.Head12_Order",
+    "Unlockable_ExoSoldier.Head13_Robot",
+    "Unlockable_ExoSoldier.Head14_Thresher",
+    "Unlockable_ExoSoldier.Head15_CrimeLord",
+    "Unlockable_ExoSoldier.Head16_Premium",
+    "Unlockable_ExoSoldier.Head23_CrushTestDummy",
+    "Unlockable_ExoSoldier.Skin01_Prison",
+    "Unlockable_ExoSoldier.Skin02_Order",
+    "Unlockable_ExoSoldier.Skin03_Ghost",
+    "Unlockable_ExoSoldier.Skin04_Tech",
+    "Unlockable_ExoSoldier.Skin05_Ripper",
+    "Unlockable_ExoSoldier.Skin06_Amara",
+    "Unlockable_ExoSoldier.Skin07_RedHanded",
+    "Unlockable_ExoSoldier.Skin08_Corrupted",
+    "Unlockable_ExoSoldier.Skin09_Sewer",
+    "Unlockable_ExoSoldier.Skin10_Hawaiian",
+    "Unlockable_ExoSoldier.Skin11_Astral",
+    "Unlockable_ExoSoldier.Skin12_Tediore",
+    "Unlockable_ExoSoldier.Skin13_3CatMoon",
+    "Unlockable_ExoSoldier.Skin14_Fire",
+    "Unlockable_ExoSoldier.Skin15_Survivalist",
+    "Unlockable_ExoSoldier.Skin16_Crimson",
+    "Unlockable_ExoSoldier.Skin17_Auger",
+    "Unlockable_ExoSoldier.Skin18_Electi",
+    "Unlockable_ExoSoldier.Skin19_Dirty",
+    "Unlockable_ExoSoldier.Skin20_HighRoller",
+    "Unlockable_ExoSoldier.Skin21_Graffiti",
+    "Unlockable_ExoSoldier.Skin22_Knitted",
+    "Unlockable_ExoSoldier.Skin23_GearboxDev",
+    "Unlockable_ExoSoldier.Skin24_PreOrder",
+    "Unlockable_ExoSoldier.Skin25_Slimed",
+    "Unlockable_ExoSoldier.Skin26_Camo",
+    "Unlockable_ExoSoldier.Skin27_Space",
+    "Unlockable_ExoSoldier.Skin28_Ritual",
+    "Unlockable_ExoSoldier.Skin29_Guardian",
+    "Unlockable_ExoSoldier.Skin30_Cute",
+    "Unlockable_ExoSoldier.Skin31_Koto",
+    "Unlockable_ExoSoldier.Skin32_DuctTaped",
+    "Unlockable_ExoSoldier.Skin33_Jakobs",
+    "Unlockable_ExoSoldier.Skin34_Daedalus",
+    "Unlockable_ExoSoldier.Skin35_Vladof",
+    "Unlockable_ExoSoldier.Skin36_Torgue",
+    "Unlockable_ExoSoldier.Skin37_Maliwan",
+    "Unlockable_ExoSoldier.Skin38_CyberPop",
+    "Unlockable_ExoSoldier.Skin39_Critters",
+    "Unlockable_ExoSoldier.Skin40_Veil",
+    "Unlockable_ExoSoldier.Skin44_Premium",
+    "Unlockable_ExoSoldier.Skin45_BreakFree",
+    "unlockable_exosoldier",
+})
+
+PROFILE_UNLOCKS_1034A.setdefault('unlockable_gravitar', [])
+PROFILE_UNLOCKS_1034A['unlockable_gravitar'] = sorted(set(PROFILE_UNLOCKS_1034A['unlockable_gravitar']) | {
+    "Unlockable_Gravitar.Body01_Prison",
+    "Unlockable_Gravitar.Body02_Premium",
+    "Unlockable_Gravitar.Head01_Prison",
+    "Unlockable_Gravitar.Head02_DreadBuns",
+    "Unlockable_Gravitar.Head03_Helmet",
+    "Unlockable_Gravitar.Head04_TechBraids",
+    "Unlockable_Gravitar.Head05_SafetyFirst",
+    "Unlockable_Gravitar.Head06_RoundGlasses",
+    "Unlockable_Gravitar.Head07_VRPunk",
+    "Unlockable_Gravitar.Head08_Survivalist",
+    "Unlockable_Gravitar.Head09_Electi",
+    "Unlockable_Gravitar.Head10_Transhuman",
+    "Unlockable_Gravitar.Head11_Ripper",
+    "Unlockable_Gravitar.Head12_Order",
+    "Unlockable_Gravitar.Head13_Robot",
+    "Unlockable_Gravitar.Head14_Thresher",
+    "Unlockable_Gravitar.Head15_CrimeLord",
+    "Unlockable_Gravitar.Head16_Premium",
+    "Unlockable_Gravitar.Head23_CrushTestDummy",
+    "Unlockable_Gravitar.Skin01_Prison",
+    "Unlockable_Gravitar.Skin02_Order",
+    "Unlockable_Gravitar.Skin03_Ghost",
+    "Unlockable_Gravitar.Skin04_Tech",
+    "Unlockable_Gravitar.Skin05_Ripper",
+    "Unlockable_Gravitar.Skin06_Amara",
+    "Unlockable_Gravitar.Skin07_RedHanded",
+    "Unlockable_Gravitar.Skin08_Corrupted",
+    "Unlockable_Gravitar.Skin09_Sewer",
+    "Unlockable_Gravitar.Skin10_Hawaiian",
+    "Unlockable_Gravitar.Skin11_Astral",
+    "Unlockable_Gravitar.Skin12_Tediore",
+    "Unlockable_Gravitar.Skin13_3CatMoon",
+    "Unlockable_Gravitar.Skin14_Fire",
+    "Unlockable_Gravitar.Skin15_Survivalist",
+    "Unlockable_Gravitar.Skin16_Crimson",
+    "Unlockable_Gravitar.Skin17_Auger",
+    "Unlockable_Gravitar.Skin18_Electi",
+    "Unlockable_Gravitar.Skin19_Dirty",
+    "Unlockable_Gravitar.Skin20_HighRoller",
+    "Unlockable_Gravitar.Skin21_Graffiti",
+    "Unlockable_Gravitar.Skin22_Knitted",
+    "Unlockable_Gravitar.Skin23_GearboxDev",
+    "Unlockable_Gravitar.Skin24_PreOrder",
+    "Unlockable_Gravitar.Skin25_Slimed",
+    "Unlockable_Gravitar.Skin26_Camo",
+    "Unlockable_Gravitar.Skin27_Space",
+    "Unlockable_Gravitar.Skin28_Ritual",
+    "Unlockable_Gravitar.Skin29_Guardian",
+    "Unlockable_Gravitar.Skin30_Cute",
+    "Unlockable_Gravitar.Skin31_Koto",
+    "Unlockable_Gravitar.Skin32_DuctTaped",
+    "Unlockable_Gravitar.Skin33_Jakobs",
+    "Unlockable_Gravitar.Skin34_Daedalus",
+    "Unlockable_Gravitar.Skin35_Vladof",
+    "Unlockable_Gravitar.Skin36_Torgue",
+    "Unlockable_Gravitar.Skin37_Maliwan",
+    "Unlockable_Gravitar.Skin38_CyberPop",
+    "Unlockable_Gravitar.Skin39_Critters",
+    "Unlockable_Gravitar.Skin40_Veil",
+    "Unlockable_Gravitar.Skin44_Premium",
+    "Unlockable_Gravitar.Skin45_BreakFree",
+    "unlockable_gravitar",
+})
+
+PROFILE_UNLOCKS_1034A.setdefault('unlockable_paladin', [])
+PROFILE_UNLOCKS_1034A['unlockable_paladin'] = sorted(set(PROFILE_UNLOCKS_1034A['unlockable_paladin']) | {
+    "Unlockable_Paladin.Body01_Prison",
+    "Unlockable_Paladin.Body02_Premium",
+    "Unlockable_Paladin.Head01_Prison",
+    "Unlockable_Paladin.Head02_PonyTail",
+    "Unlockable_Paladin.Head03_BaldMask",
+    "Unlockable_Paladin.Head04_Visor",
+    "Unlockable_Paladin.Head05_Goth",
+    "Unlockable_Paladin.Head06_Hooded",
+    "Unlockable_Paladin.Head07_Headband",
+    "Unlockable_Paladin.Head08_Survivalist",
+    "Unlockable_Paladin.Head09_Electi",
+    "Unlockable_Paladin.Head10_Transhuman",
+    "Unlockable_Paladin.Head11_Ripper",
+    "Unlockable_Paladin.Head12_Order",
+    "Unlockable_Paladin.Head13_Robot",
+    "Unlockable_Paladin.Head14_Thresher",
+    "Unlockable_Paladin.Head15_CrimeLord",
+    "Unlockable_Paladin.Head16_Premium",
+    "Unlockable_Paladin.Head23_CrushTestDummy",
+    "Unlockable_Paladin.Skin01_Prison",
+    "Unlockable_Paladin.Skin02_Order",
+    "Unlockable_Paladin.Skin03_Ghost",
+    "Unlockable_Paladin.Skin04_Tech",
+    "Unlockable_Paladin.Skin05_Ripper",
+    "Unlockable_Paladin.Skin06_Amara",
+    "Unlockable_Paladin.Skin07_RedHanded",
+    "Unlockable_Paladin.Skin08_Corrupted",
+    "Unlockable_Paladin.Skin09_Sewer",
+    "Unlockable_Paladin.Skin10_Hawaiian",
+    "Unlockable_Paladin.Skin11_Astral",
+    "Unlockable_Paladin.Skin12_Tediore",
+    "Unlockable_Paladin.Skin13_3CatMoon",
+    "Unlockable_Paladin.Skin14_Fire",
+    "Unlockable_Paladin.Skin15_Survivalist",
+    "Unlockable_Paladin.Skin16_Crimson",
+    "Unlockable_Paladin.Skin17_Auger",
+    "Unlockable_Paladin.Skin18_Electi",
+    "Unlockable_Paladin.Skin19_Dirty",
+    "Unlockable_Paladin.Skin20_HighRoller",
+    "Unlockable_Paladin.Skin21_Graffiti",
+    "Unlockable_Paladin.Skin22_Knitted",
+    "Unlockable_Paladin.Skin23_GearboxDev",
+    "Unlockable_Paladin.Skin24_PreOrder",
+    "Unlockable_Paladin.Skin25_Slimed",
+    "Unlockable_Paladin.Skin26_Camo",
+    "Unlockable_Paladin.Skin27_Space",
+    "Unlockable_Paladin.Skin28_Ritual",
+    "Unlockable_Paladin.Skin29_Guardian",
+    "Unlockable_Paladin.Skin30_Cute",
+    "Unlockable_Paladin.Skin31_Koto",
+    "Unlockable_Paladin.Skin32_DuctTaped",
+    "Unlockable_Paladin.Skin33_Jakobs",
+    "Unlockable_Paladin.Skin34_Daedalus",
+    "Unlockable_Paladin.Skin35_Vladof",
+    "Unlockable_Paladin.Skin36_Torgue",
+    "Unlockable_Paladin.Skin37_Maliwan",
+    "Unlockable_Paladin.Skin38_CyberPop",
+    "Unlockable_Paladin.Skin39_Critters",
+    "Unlockable_Paladin.Skin40_Veil",
+    "Unlockable_Paladin.Skin44_Premium",
+    "Unlockable_Paladin.Skin45_BreakFree",
+    "unlockable_paladin",
+})
+
+PROFILE_UNLOCKS_1034A.setdefault('unlockable_vehicles', [])
+PROFILE_UNLOCKS_1034A['unlockable_vehicles'] = sorted(set(PROFILE_UNLOCKS_1034A['unlockable_vehicles']) | {
+    "Unlockable_Vehicles.Borg",
+    "Unlockable_Vehicles.DarkSiren",
+    "Unlockable_Vehicles.DarkSiren_Proto",
+    "Unlockable_Vehicles.ExoSoldier",
+    "Unlockable_Vehicles.ExoSoldier_Proto",
+    "Unlockable_Vehicles.Gravitar",
+    "Unlockable_Vehicles.Gravitar_Proto",
+    "Unlockable_Vehicles.Grazer",
+    "Unlockable_Vehicles.Mat01_Synthwave",
+    "Unlockable_Vehicles.Mat02_LavaRock",
+    "Unlockable_Vehicles.Mat03_BioGoo",
+    "Unlockable_Vehicles.Mat04_Doodles",
+    "Unlockable_Vehicles.Mat05_FransFroyo",
+    "Unlockable_Vehicles.Mat06_ElectiSamurai",
+    "Unlockable_Vehicles.Mat07_CuteCat",
+    "Unlockable_Vehicles.Mat08_EchoBot",
+    "Unlockable_Vehicles.Mat09_FolkHero",
+    "Unlockable_Vehicles.Mat10_Graffiti",
+    "Unlockable_Vehicles.Mat11_Cupcake",
+    "Unlockable_Vehicles.Mat12_AnimalPrint",
+    "Unlockable_Vehicles.Mat13_Whiteout",
+    "Unlockable_Vehicles.Mat14_Grunt",
+    "Unlockable_Vehicles.Mat15_Retro",
+    "Unlockable_Vehicles.Mat16_PolePosition",
+    "Unlockable_Vehicles.Mat17_DeadWood",
+    "Unlockable_Vehicles.Mat18_CrashTest",
+    "Unlockable_Vehicles.Mat19_Meltdown",
+    "Unlockable_Vehicles.Mat20_Cyberspace",
+    "Unlockable_Vehicles.Mat21_Afterburn",
+    "Unlockable_Vehicles.Mat22_Overload",
+    "Unlockable_Vehicles.Mat23_FutureProof",
+    "Unlockable_Vehicles.Mat24_Propaganda",
+    "Unlockable_Vehicles.Mat25_LocustGas",
+    "Unlockable_Vehicles.Mat26_AugerSight",
+    "Unlockable_Vehicles.Mat27_GoldenPower",
+    "Unlockable_Vehicles.Mat28_Ripper",
+    "Unlockable_Vehicles.Mat29_Cheers",
+    "Unlockable_Vehicles.Mat30_CrimsonRaiders",
+    "Unlockable_Vehicles.Mat31_Splash",
+    "Unlockable_Vehicles.Mat32_ImperialGuard",
+    "Unlockable_Vehicles.Mat33_Creepy",
+    "Unlockable_Vehicles.Mat34_MoneyCamo",
+    "Unlockable_Vehicles.Mat35_GearboxDev",
+    "Unlockable_Vehicles.Paladin",
+    "Unlockable_Vehicles.Paladin_Proto",
+    "Unlockable_Vehicles.mat40_animemech",
+    "Unlockable_Vehicles.mat41_synthesizer",
+    "Unlockable_Vehicles.mat42_gratata",
+    "Unlockable_Vehicles.mat43_nitroflame",
+    "Unlockable_Vehicles.mat44_hotrod",
+    "Unlockable_Vehicles.mat45_ripperuncommon",
+    "Unlockable_Vehicles.mat46_daedalusuncommon",
+    "Unlockable_Vehicles.mat47_jakobsuncommon",
+    "Unlockable_Vehicles.mat48_maliwanuncommon",
+    "Unlockable_Vehicles.mat49_orderuncommon",
+    "Unlockable_Vehicles.mat50_tedioreuncommon",
+    "Unlockable_Vehicles.mat51_torgueuncommon",
+    "Unlockable_Vehicles.mat52_vladofuncommon",
+    "unlockable_vehicles",
+})
+
+PROFILE_UNLOCKS_1034A.setdefault('unlockable_weapons', [])
+PROFILE_UNLOCKS_1034A['unlockable_weapons'] = sorted(set(PROFILE_UNLOCKS_1034A['unlockable_weapons']) | {
+    "Unlockable_Weapons.Mat01_Synthwave",
+    "Unlockable_Weapons.Mat02_LavaRock",
+    "Unlockable_Weapons.Mat03_BioGoo",
+    "Unlockable_Weapons.Mat04_Doodles",
+    "Unlockable_Weapons.Mat05_FransFroyo",
+    "Unlockable_Weapons.Mat06_ElectiSamurai",
+    "Unlockable_Weapons.Mat07_CuteCat",
+    "Unlockable_Weapons.Mat08_EchoBot",
+    "Unlockable_Weapons.Mat09_FolkHero",
+    "Unlockable_Weapons.Mat10_Graffiti",
+    "Unlockable_Weapons.Mat11_Cupcake",
+    "Unlockable_Weapons.Mat12_AnimalPrint",
+    "Unlockable_Weapons.Mat13_Whiteout",
+    "Unlockable_Weapons.Mat14_Grunt",
+    "Unlockable_Weapons.Mat15_Retro",
+    "Unlockable_Weapons.Mat16_PolePosition",
+    "Unlockable_Weapons.Mat17_DeadWood",
+    "Unlockable_Weapons.Mat18_CrashTest",
+    "Unlockable_Weapons.Mat19_Meltdown",
+    "Unlockable_Weapons.Mat20_Cyberspace",
+    "Unlockable_Weapons.Mat21_Afterburn",
+    "Unlockable_Weapons.Mat22_Overload",
+    "Unlockable_Weapons.Mat23_FutureProof",
+    "Unlockable_Weapons.Mat24_Propaganda",
+    "Unlockable_Weapons.Mat25_LocustGas",
+    "Unlockable_Weapons.Mat26_AugerSight",
+    "Unlockable_Weapons.Mat27_GoldenPower",
+    "Unlockable_Weapons.Mat28_Ripper",
+    "Unlockable_Weapons.Mat29_Cheers",
+    "Unlockable_Weapons.Mat30_CrimsonRaiders",
+    "Unlockable_Weapons.Mat31_Splash",
+    "Unlockable_Weapons.Mat32_ImperialGuard",
+    "Unlockable_Weapons.Mat33_Creepy",
+    "Unlockable_Weapons.Mat34_MoneyCamo",
+    "Unlockable_Weapons.Mat35_GearboxDev",
+    "Unlockable_Weapons.Mat36_PreOrder",
+    "Unlockable_Weapons.Mat37_SHiFT",
+    "Unlockable_Weapons.Mat38_HeadHunter",
+    "Unlockable_Weapons.Mat39_Premium",
+    "Unlockable_Weapons.Shiny_Loarmaster",
+    "Unlockable_Weapons.Shiny_Ultimate",
+    "Unlockable_Weapons.shiny_anarchy",
+    "Unlockable_Weapons.shiny_asher",
+    "Unlockable_Weapons.shiny_atlien",
+    "Unlockable_Weapons.shiny_ballista",
+    "Unlockable_Weapons.shiny_beegun",
+    "Unlockable_Weapons.shiny_bloodstarved",
+    "Unlockable_Weapons.shiny_bod",
+    "Unlockable_Weapons.shiny_bonnieclyde",
+    "Unlockable_Weapons.shiny_boomslang",
+    "Unlockable_Weapons.shiny_bugbear",
+    "Unlockable_Weapons.shiny_bully",
+    "Unlockable_Weapons.shiny_chuck",
+    "Unlockable_Weapons.shiny_coldshoulder",
+    "Unlockable_Weapons.shiny_commbd",
+    "Unlockable_Weapons.shiny_complex_root",
+    "Unlockable_Weapons.shiny_conglomerate",
+    "Unlockable_Weapons.shiny_convergence",
+    "Unlockable_Weapons.shiny_crowdsourced",
+    "Unlockable_Weapons.shiny_dividedfocus",
+    "Unlockable_Weapons.shiny_dualdamage",
+    "Unlockable_Weapons.shiny_finnty",
+    "Unlockable_Weapons.shiny_fisheye",
+    "Unlockable_Weapons.shiny_gmr",
+    "Unlockable_Weapons.shiny_goalkeeper",
+    "Unlockable_Weapons.shiny_goldengod",
+    "Unlockable_Weapons.shiny_goremaster",
+    "Unlockable_Weapons.shiny_heartgun",
+    "Unlockable_Weapons.shiny_heavyturret",
+    "Unlockable_Weapons.shiny_hellfire",
+    "Unlockable_Weapons.shiny_hellwalker",
+    "Unlockable_Weapons.shiny_kaleidosplode",
+    "Unlockable_Weapons.shiny_kaoson",
+    "Unlockable_Weapons.shiny_katagawa",
+    "Unlockable_Weapons.shiny_kickballer",
+    "Unlockable_Weapons.shiny_kingsgambit",
+    "Unlockable_Weapons.shiny_leadballoon",
+    "Unlockable_Weapons.shiny_linebacker",
+    "Unlockable_Weapons.shiny_lucian",
+    "Unlockable_Weapons.shiny_lumberjack",
+    "Unlockable_Weapons.shiny_luty",
+    "Unlockable_Weapons.shiny_noisycricket",
+    "Unlockable_Weapons.shiny_ohmigot",
+    "Unlockable_Weapons.shiny_om",
+    "Unlockable_Weapons.shiny_onslaught",
+    "Unlockable_Weapons.shiny_phantom_flame",
+    "Unlockable_Weapons.shiny_plasmacoil",
+    "Unlockable_Weapons.shiny_potatothrower",
+    "Unlockable_Weapons.shiny_prince",
+    "Unlockable_Weapons.shiny_queensrest",
+    "Unlockable_Weapons.shiny_quickdraw",
+    "Unlockable_Weapons.shiny_rainbowvomit",
+    "Unlockable_Weapons.shiny_rangefinder",
+    "Unlockable_Weapons.shiny_roach",
+    "Unlockable_Weapons.shiny_rocketreload",
+    "Unlockable_Weapons.shiny_rowan",
+    "Unlockable_Weapons.shiny_rubysgrasp",
+    "Unlockable_Weapons.shiny_seventh_sense",
+    "Unlockable_Weapons.shiny_sideshow",
+    "Unlockable_Weapons.shiny_slugger",
+    "Unlockable_Weapons.shiny_star_helix",
+    "Unlockable_Weapons.shiny_stopgap",
+    "Unlockable_Weapons.shiny_stray",
+    "Unlockable_Weapons.shiny_sweet_embrace",
+    "Unlockable_Weapons.shiny_symmetry",
+    "Unlockable_Weapons.shiny_tkswave",
+    "Unlockable_Weapons.shiny_truck",
+    "Unlockable_Weapons.shiny_vamoose",
+    "Unlockable_Weapons.shiny_wf",
+    "Unlockable_Weapons.shiny_wombocombo",
+    "Unlockable_Weapons.shiny_zipgun",
+    "unlockable_weapons",
+})
+
+# === END: auto-extended unlocks from reference profile ===
+CLASS_TO_UNLOCK_KEY_1034A = {
+    "Char_DarkSiren":"unlockable_darksiren",
+    "Char_ExoSoldier":"unlockable_exosoldier",
+    "Char_Gravitar":"unlockable_gravitar",
+    "Char_Paladin":"unlockable_paladin",
+}
+
+REWARD_KEY_HINTS_1034A = ("Reward_","RewardPackage_","pgraph.sdu_upgrades.","Reward_HoverDrive_","Reward_Vehicle_")
+
+def _ensure_list_1034a(x): return x if isinstance(x,list) else []
+def _collect_strings_1034a(node):
+    out=[]
+    if isinstance(node,dict):
+        for v in node.values(): out.extend(_collect_strings_1034a(v))
+    elif isinstance(node,list):
+        for v in node: out.extend(_collect_strings_1034a(v))
+    elif isinstance(node,str):
+        out.append(node)
+    return out
+
+def _unlock_entries_1034a(save_obj,entries):
+    if not entries: return 0
+    st=save_obj.setdefault('state',{})
+    uniq=st.setdefault('unique_rewards',[])
+    added=0
+    for e in entries:
+        if e.startswith("Reward") or e.startswith("pgraph."):
+            if e not in uniq: uniq.append(e); added+=1
+        else:
+            ul=save_obj.setdefault('unlockables',{})
+            flat=ul.setdefault('entries',[])
+            if e not in flat: flat.append(e); added+=1
+    return added
+
+def _merge_profile_unlocks_1034a(save_obj,chosen_class):
+    total=0
+    total+=_unlock_entries_1034a(save_obj,PROFILE_UNLOCKS_1034A.get("shared_progress",{}).get("entries",[]))
+    class_key=CLASS_TO_UNLOCK_KEY_1034A.get(chosen_class)
+    if class_key:
+        total+=_unlock_entries_1034a(save_obj,PROFILE_UNLOCKS_1034A.get(class_key,{}).get("entries",[]))
+    for k in ("unlockable_echo4","unlockable_weapons","unlockable_vehicles"):
+        total+=_unlock_entries_1034a(save_obj,PROFILE_UNLOCKS_1034A.get(k,{}).get("entries",[]))
+    return total
+
+def _promote_reward_packages_1034a(save_obj):
+    st=save_obj.setdefault('state',{})
+    uniq=st.setdefault('unique_rewards',[])
+    seen=set(uniq)
+    strings=_collect_strings_1034a(st)
+    added=0
+    for s in strings:
+        if any(h in s for h in REWARD_KEY_HINTS_1034A):
+            if s not in seen: uniq.append(s); seen.add(s); added+=1
+    return added
+
+def _maybe_unlock_map_1034a(save_obj):
+    st=save_obj.setdefault('state',{})
+    changed=0
+    world=st.setdefault("world",{})
+    areas=world.setdefault("areas",{})
+    if not areas:
+        default_areas=["Pandora","Eden-6","Promethea","Nekrotafeyo"]
+        for zone in default_areas:
+            areas[zone]={"visited":True,"discovered":True}; changed+=2
+    else:
+        for name,node in areas.items():
+            if isinstance(node,dict):
+                if not node.get("visited"): node["visited"]=True; changed+=1
+                if not node.get("discovered"): node["discovered"]=True; changed+=1
+    return changed
+
+def _set_class_1034a(save_obj,new_class):
+    st=save_obj.setdefault('state',{}); st['class']=new_class
+    dom=save_obj.get('domains',{}).get('local',{})
+    if isinstance(dom,dict): dom['characters_selected']=new_class
+
+def _sync_points_with_level_1034a(save_obj):
+    st=save_obj.setdefault('state',{})
+    lvl=st.get("level",1)
+    expected_points=max(0,lvl-1)
+    st["spec_points"]=expected_points
+    cp=st.setdefault("character_points",{})
+    cp["unspent"]=expected_points
+    return expected_points
+
+
+def _resolve_profile_unlocks_catalog_1034a(globals_dict):
+    # Prefer the 1.033a catalog if present
+    catalog = globals_dict.get("EMBEDDED_PROFILE_UNLOCKS")
+    if isinstance(catalog, dict):
+        return catalog
+    # Fallback to our minimal structure if not found (kept empty to avoid drift)
+    return {
+        "shared_progress": [],
+        "unlockable_darksiren": [],
+        "unlockable_exosoldier": [],
+        "unlockable_gravitar": [],
+        "unlockable_paladin": [],
+        "unlockable_echo4": [],
+        "unlockable_weapons": [],
+        "unlockable_vehicles": [],
+    }
+
+
+# ---- 1.034a: EXTRA unlocks  ----
+EXTRA_PROFILE_UNLOCKS_1034A = {
+  "shared_progress": [
+    "shared_progress.vault_hunter_level",
+    "shared_progress.prologue_completed",
+    "shared_progress.story_completed",
+    "shared_progress.epilogue_started"
+  ],
+  "unlockable_darksiren": [
+    "Unlockable_DarkSiren.Head01_Prison",
+    "Unlockable_DarkSiren.Body01_Prison",
+    "Unlockable_DarkSiren.Skin01_Prison",
+    "Unlockable_DarkSiren.Skin24_PreOrder",
+    "Unlockable_DarkSiren.Head23_CrashTestDummy",
+    "Unlockable_DarkSiren.Body02_Premium",
+    "Unlockable_DarkSiren.Head16_Premium",
+    "Unlockable_DarkSiren.Skin44_Premium",
+    "Unlockable_DarkSiren.Skin10_Hawaiian",
+    "Unlockable_DarkSiren.Skin31_Koto",
+    "Unlockable_DarkSiren.Skin02_Order",
+    "Unlockable_DarkSiren.Skin37_Maliwan",
+    "Unlockable_DarkSiren.Head02_PigTails",
+    "Unlockable_DarkSiren.Skin14_Fire",
+    "Unlockable_DarkSiren.Head06_PunkMask",
+    "Unlockable_DarkSiren.Skin05_Ripper",
+    "Unlockable_DarkSiren.Skin25_Slimed",
+    "Unlockable_DarkSiren.Head11_Ripper",
+    "Unlockable_DarkSiren.Skin26_Camo",
+    "Unlockable_DarkSiren.Skin04_Tech",
+    "Unlockable_DarkSiren.Skin06_Amara",
+    "Unlockable_DarkSiren.Head05_BikeHelmet",
+    "Unlockable_DarkSiren.Skin08_Corrupted",
+    "Unlockable_DarkSiren.Head12_Order",
+    "Unlockable_DarkSiren.Skin29_Guardian",
+    "Unlockable_DarkSiren.Skin07_RedHanded",
+    "Unlockable_DarkSiren.Head07_Demon",
+    "Unlockable_DarkSiren.Skin34_Daedalus",
+    "Unlockable_DarkSiren.Skin40_Veil",
+    "Unlockable_DarkSiren.Skin45_BreakFree",
+    "Unlockable_DarkSiren.Skin03_Ghost",
+    "Unlockable_DarkSiren.Head08_Survivalist",
+    "Unlockable_DarkSiren.Skin09_Sewer",
+    "Unlockable_DarkSiren.Head09_Electi",
+    "Unlockable_DarkSiren.Head15_CrimeLord",
+    "Unlockable_DarkSiren.Skin11_Astral",
+    "Unlockable_DarkSiren.Head10_Transhuman",
+    "Unlockable_DarkSiren.Skin18_Electi",
+    "Unlockable_DarkSiren.Skin13_3CatMoon",
+    "Unlockable_DarkSiren.Skin15_Survivalist",
+    "Unlockable_DarkSiren.Skin17_Auger",
+    "Unlockable_DarkSiren.Skin27_Space",
+    "Unlockable_DarkSiren.Head04_Shades",
+    "Unlockable_DarkSiren.Skin12_Tediore",
+    "Unlockable_DarkSiren.Head14_Thresher",
+    "Unlockable_DarkSiren.Skin16_Crimson"
+  ],
+  "unlockable_exosoldier": [
+    "Unlockable_ExoSoldier.Head01_Prison",
+    "Unlockable_ExoSoldier.Body01_Prison",
+    "Unlockable_ExoSoldier.Skin01_Prison",
+    "Unlockable_ExoSoldier.Skin24_PreOrder",
+    "Unlockable_ExoSoldier.Head23_CrushTestDummy",
+    "Unlockable_ExoSoldier.Body02_Premium",
+    "Unlockable_ExoSoldier.Head16_Premium",
+    "Unlockable_ExoSoldier.Skin44_Premium",
+    "Unlockable_ExoSoldier.Skin10_Hawaiian",
+    "Unlockable_ExoSoldier.Skin31_Koto",
+    "Unlockable_ExoSoldier.Skin02_Order",
+    "Unlockable_ExoSoldier.Skin37_Maliwan",
+    "Unlockable_ExoSoldier.Head03_Guerilla",
+    "Unlockable_ExoSoldier.Skin14_Fire",
+    "Unlockable_ExoSoldier.Head04_TechHawk",
+    "Unlockable_ExoSoldier.Skin05_Ripper",
+    "Unlockable_ExoSoldier.Skin25_Slimed",
+    "Unlockable_ExoSoldier.Head11_Ripper",
+    "Unlockable_ExoSoldier.Skin26_Camo",
+    "Unlockable_ExoSoldier.Skin04_Tech",
+    "Unlockable_ExoSoldier.Skin06_Amara",
+    "Unlockable_ExoSoldier.Head07_Helm",
+    "Unlockable_ExoSoldier.Skin08_Corrupted",
+    "Unlockable_ExoSoldier.Head12_Order",
+    "Unlockable_ExoSoldier.Skin29_Guardian",
+    "Unlockable_ExoSoldier.Skin07_RedHanded",
+    "Unlockable_ExoSoldier.Head06_BlindFold",
+    "Unlockable_ExoSoldier.Skin34_Daedalus",
+    "Unlockable_ExoSoldier.Skin40_Veil",
+    "Unlockable_ExoSoldier.Skin45_BreakFree",
+    "Unlockable_ExoSoldier.Skin03_Ghost",
+    "Unlockable_ExoSoldier.Head08_Survivalist",
+    "Unlockable_ExoSoldier.Skin09_Sewer",
+    "Unlockable_ExoSoldier.Head09_Electi",
+    "Unlockable_ExoSoldier.Head15_CrimeLord",
+    "Unlockable_ExoSoldier.Skin11_Astral",
+    "Unlockable_ExoSoldier.Head10_Transhuman",
+    "Unlockable_ExoSoldier.Skin18_Electi",
+    "Unlockable_ExoSoldier.Skin13_3CatMoon",
+    "Unlockable_ExoSoldier.Skin15_Survivalist",
+    "Unlockable_ExoSoldier.Skin17_Auger",
+    "Unlockable_ExoSoldier.Skin27_Space",
+    "Unlockable_ExoSoldier.Head05_LongHair",
+    "Unlockable_ExoSoldier.Skin12_Tediore",
+    "Unlockable_ExoSoldier.Head14_Thresher",
+    "Unlockable_ExoSoldier.Skin16_Crimson"
+  ],
+  "unlockable_gravitar": [
+    "Unlockable_Gravitar.Head01_Prison",
+    "Unlockable_Gravitar.Body01_Prison",
+    "Unlockable_Gravitar.Skin01_Prison",
+    "Unlockable_Gravitar.Skin24_PreOrder",
+    "Unlockable_Gravitar.Head23_CrushTestDummy",
+    "Unlockable_Gravitar.Body02_Premium",
+    "Unlockable_Gravitar.Head16_Premium",
+    "Unlockable_Gravitar.Skin44_Premium",
+    "Unlockable_Gravitar.Skin10_Hawaiian",
+    "Unlockable_Gravitar.Skin31_Koto",
+    "Unlockable_Gravitar.Skin02_Order",
+    "Unlockable_Gravitar.Skin37_Maliwan",
+    "Unlockable_Gravitar.Head02_DreadBuns",
+    "Unlockable_Gravitar.Skin14_Fire",
+    "Unlockable_Gravitar.Head05_SafetyFirst",
+    "Unlockable_Gravitar.Skin05_Ripper",
+    "Unlockable_Gravitar.Skin25_Slimed",
+    "Unlockable_Gravitar.Head11_Ripper",
+    "Unlockable_Gravitar.Skin26_Camo",
+    "Unlockable_Gravitar.Skin04_Tech",
+    "Unlockable_Gravitar.Skin06_Amara",
+    "Unlockable_Gravitar.Head03_Helmet",
+    "Unlockable_Gravitar.Skin08_Corrupted",
+    "Unlockable_Gravitar.Head12_Order",
+    "Unlockable_Gravitar.Skin29_Guardian",
+    "Unlockable_Gravitar.Skin07_RedHanded",
+    "Unlockable_Gravitar.Head04_TechBraids",
+    "Unlockable_Gravitar.Skin34_Daedalus",
+    "Unlockable_Gravitar.Skin40_Veil",
+    "Unlockable_Gravitar.Skin45_BreakFree",
+    "Unlockable_Gravitar.Skin03_Ghost",
+    "Unlockable_Gravitar.Head08_Survivalist",
+    "Unlockable_Gravitar.Skin09_Sewer",
+    "Unlockable_Gravitar.Head09_Electi",
+    "Unlockable_Gravitar.Head15_CrimeLord",
+    "Unlockable_Gravitar.Skin11_Astral",
+    "Unlockable_Gravitar.Head10_Transhuman",
+    "Unlockable_Gravitar.Skin18_Electi",
+    "Unlockable_Gravitar.Skin13_3CatMoon",
+    "Unlockable_Gravitar.Skin15_Survivalist",
+    "Unlockable_Gravitar.Skin17_Auger",
+    "Unlockable_Gravitar.Skin27_Space",
+    "Unlockable_Gravitar.Head06_RoundGlasses",
+    "Unlockable_Gravitar.Skin12_Tediore",
+    "Unlockable_Gravitar.Head14_Thresher",
+    "Unlockable_Gravitar.Skin16_Crimson"
+  ],
+  "unlockable_paladin": [
+    "Unlockable_Paladin.Head01_Prison",
+    "Unlockable_Paladin.Body01_Prison",
+    "Unlockable_Paladin.Skin01_Prison",
+    "Unlockable_Paladin.Skin24_PreOrder",
+    "Unlockable_Paladin.Head23_CrushTestDummy",
+    "Unlockable_Paladin.Body02_Premium",
+    "Unlockable_Paladin.Head16_Premium",
+    "Unlockable_Paladin.Skin44_Premium",
+    "Unlockable_Paladin.Skin10_Hawaiian",
+    "Unlockable_Paladin.Skin31_Koto",
+    "Unlockable_Paladin.Skin02_Order",
+    "Unlockable_Paladin.Skin37_Maliwan",
+    "Unlockable_Paladin.Head02_PonyTail",
+    "Unlockable_Paladin.Skin14_Fire",
+    "Unlockable_Paladin.Head03_BaldMask",
+    "Unlockable_Paladin.Skin05_Ripper",
+    "Unlockable_Paladin.Skin25_Slimed",
+    "Unlockable_Paladin.Head11_Ripper",
+    "Unlockable_Paladin.Skin26_Camo",
+    "Unlockable_Paladin.Skin04_Tech",
+    "Unlockable_Paladin.Skin06_Amara",
+    "Unlockable_Paladin.Head04_Visor",
+    "Unlockable_Paladin.Skin08_Corrupted",
+    "Unlockable_Paladin.Head12_Order",
+    "Unlockable_Paladin.Skin29_Guardian",
+    "Unlockable_Paladin.Skin07_RedHanded",
+    "Unlockable_Paladin.Head06_Hooded",
+    "Unlockable_Paladin.Skin34_Daedalus",
+    "Unlockable_Paladin.Skin40_Veil",
+    "Unlockable_Paladin.Skin45_BreakFree",
+    "Unlockable_Paladin.Skin03_Ghost",
+    "Unlockable_Paladin.Head08_Survivalist",
+    "Unlockable_Paladin.Skin09_Sewer",
+    "Unlockable_Paladin.Head09_Electi",
+    "Unlockable_Paladin.Head15_CrimeLord",
+    "Unlockable_Paladin.Skin11_Astral",
+    "Unlockable_Paladin.Head10_Transhuman",
+    "Unlockable_Paladin.Skin18_Electi",
+    "Unlockable_Paladin.Skin13_3CatMoon",
+    "Unlockable_Paladin.Skin15_Survivalist",
+    "Unlockable_Paladin.Skin17_Auger",
+    "Unlockable_Paladin.Skin27_Space",
+    "Unlockable_Paladin.Head05_Goth",
+    "Unlockable_Paladin.Skin12_Tediore",
+    "Unlockable_Paladin.Head14_Thresher",
+    "Unlockable_Paladin.Skin16_Crimson"
+  ],
+  "unlockable_echo4": [
+    "Unlockable_Echo4.Skin01_Prison",
+    "Unlockable_Echo4.Skin42_Legacy",
+    "Unlockable_Echo4.Skin24_PreOrder",
+    "Unlockable_Echo4.attachment01_partyhat",
+    "Unlockable_Echo4.Skin14_Fire",
+    "Unlockable_Echo4.Skin50_BreakTheGame",
+    "Unlockable_Echo4.attachment10_crown",
+    "Unlockable_Echo4.attachment04_wings",
+    "Unlockable_Echo4.Skin37_Maliwan",
+    "Unlockable_Echo4.Skin05_Ripper",
+    "Unlockable_Echo4.Body03_Ripper",
+    "Unlockable_Echo4.Skin04_Tech",
+    "Unlockable_Echo4.Skin33_Jakobs",
+    "Unlockable_Echo4.attachment09_goggles",
+    "Unlockable_Echo4.attachment07_horns",
+    "Unlockable_Echo4.Skin38_CyberPop",
+    "Unlockable_Echo4.Skin02_Order",
+    "Unlockable_Echo4.Skin07_RedHanded",
+    "Unlockable_Echo4.Skin22_Knitted",
+    "Unlockable_Echo4.Skin25_Slimed",
+    "Unlockable_Echo4.Skin29_Guardian",
+    "Unlockable_Echo4.Skin35_Vladof",
+    "Unlockable_Echo4.Skin19_Dirty",
+    "Unlockable_Echo4.Skin11_Astral",
+    "Unlockable_Echo4.Skin36_Torgue",
+    "Unlockable_Echo4.Skin45_BreakFree",
+    "Unlockable_Echo4.attachment08_tinfoilhat",
+    "Unlockable_Echo4.Skin09_Sewer",
+    "Unlockable_Echo4.Skin18_Electi",
+    "Unlockable_Echo4.Skin15_Survivalist",
+    "Unlockable_Echo4.Skin17_Auger",
+    "Unlockable_Echo4.Skin27_Space",
+    "Unlockable_Echo4.Body01_GeneVIV",
+    "Unlockable_Echo4.Skin12_Tediore",
+    "Unlockable_Echo4.Skin32_DuctTaped",
+    "Unlockable_Echo4.Skin16_Crimson"
+  ],
+  "unlockable_weapons": [
+    "Unlockable_Weapons.Mat01_Synthwave",
+    "Unlockable_Weapons.Mat36_PreOrder",
+    "Unlockable_Weapons.Mat38_HeadHunter",
+    "Unlockable_Weapons.Mat29_Cheers",
+    "Unlockable_Weapons.Mat17_DeadWood",
+    "Unlockable_Weapons.Mat25_LocustGas",
+    "Unlockable_Weapons.Mat26_AugerSight",
+    "Unlockable_Weapons.Mat07_CuteCat",
+    "Unlockable_Weapons.Mat13_Whiteout",
+    "Unlockable_Weapons.Mat27_GoldenPower",
+    "Unlockable_Weapons.Mat14_Grunt",
+    "Unlockable_Weapons.shiny_leadballoon",
+    "Unlockable_Weapons.shiny_convergence",
+    "Unlockable_Weapons.shiny_boomslang",
+    "Unlockable_Weapons.Mat08_EchoBot",
+    "Unlockable_Weapons.Mat18_CrashTest",
+    "Unlockable_Weapons.shiny_luty",
+    "Unlockable_Weapons.shiny_rocketreload",
+    "Unlockable_Weapons.Mat06_ElectiSamurai",
+    "Unlockable_Weapons.shiny_noisycricket",
+    "Unlockable_Weapons.shiny_heavyturret",
+    "Unlockable_Weapons.shiny_kaoson",
+    "Unlockable_Weapons.Mat33_Creepy",
+    "Unlockable_Weapons.Mat34_MoneyCamo",
+    "Unlockable_Weapons.Mat30_CrimsonRaiders",
+    "Unlockable_Weapons.Mat32_ImperialGuard",
+    "Unlockable_Weapons.shiny_kaleidosplode",
+    "Unlockable_Weapons.shiny_slugger",
+    "Unlockable_Weapons.shiny_beegun",
+    "Unlockable_Weapons.shiny_kickballer",
+    "Unlockable_Weapons.shiny_vamoose",
+    "Unlockable_Weapons.shiny_anarchy"
+  ],
+  "unlockable_vehicles": [
+    "Unlockable_Vehicles.Grazer",
+    "Unlockable_Vehicles.Mat34_MoneyCamo",
+    "Unlockable_Vehicles.Mat29_Cheers",
+    "Unlockable_Vehicles.Mat13_Whiteout",
+    "Unlockable_Vehicles.Mat20_Cyberspace",
+    "Unlockable_Vehicles.Mat07_CuteCat",
+    "Unlockable_Vehicles.DarkSiren_Proto",
+    "Unlockable_Vehicles.DarkSiren",
+    "Unlockable_Vehicles.Gravitar_Proto",
+    "Unlockable_Vehicles.Mat19_Meltdown",
+    "Unlockable_Vehicles.Paladin_Proto",
+    "Unlockable_Vehicles.Borg",
+    "Unlockable_Vehicles.ExoSoldier_Proto",
+    "Unlockable_Vehicles.Mat27_GoldenPower",
+    "Unlockable_Vehicles.mat47_jakobsuncommon",
+    "Unlockable_Vehicles.Mat01_Synthwave",
+    "Unlockable_Vehicles.Mat32_ImperialGuard",
+    "Unlockable_Vehicles.Mat33_Creepy"
+  ]
+}
+
+def _merge_extras_into_embedded_unlocks_1034a(catalog):
+    # catalog is the 1.033a EMBEDDED_PROFILE_UNLOCKS (dict of lists)
+    if not isinstance(catalog, dict): return catalog
+    out = {}
+    keys = [
+        "shared_progress","unlockable_darksiren","unlockable_exosoldier",
+        "unlockable_gravitar","unlockable_paladin","unlockable_echo4",
+        "unlockable_weapons","unlockable_vehicles"
+    ]
+    for k in keys:
+        base = catalog.get(k, [])
+        extra = EXTRA_PROFILE_UNLOCKS_1034A.get(k, [])
+        merged = list(base) + [x for x in extra if x not in base]
+        out[k] = merged
+    return out
+def attach_ui_1034a(app):
+    # app is your main UI instance; add controls if tab_progression exists
+    try:
+        parent = getattr(app, "tab_progression", None) or app.root
+        frm = ttk.LabelFrame(parent, text="1.034a — Class & Unlocks")
+        frm.pack(fill="x", padx=8, pady=8)
+
+        ttk.Label(frm, text="Class:").grid(row=0, column=0, sticky="w", padx=6, pady=6)
+        app.cbo_class_1034a = ttk.Combobox(frm, values=AVAILABLE_CLASSES_1034A, state="readonly", width=22)
+        app.cbo_class_1034a.grid(row=0, column=1, sticky="w", padx=6, pady=6)
+
+        cur = (app.save_data or {}).get('state', {}).get('class', '')
+        if cur in AVAILABLE_CLASSES_1034A:
+            app.cbo_class_1034a.set(cur)
+
+        ttk.Button(frm, text="Apply Class", command=lambda: _on_apply_class_btn_1034a(app)).grid(row=0, column=2, padx=6, pady=6)
+        ttk.Button(frm, text="Unlock All (Class + Core Packs)", command=lambda: _on_unlock_all_btn_1034a(app)).grid(row=0, column=3, padx=6, pady=6)
+        ttk.Button(frm, text="Unlock Map", command=lambda: _on_unlock_map_btn_1034a(app)).grid(row=0, column=4, padx=6, pady=6)
+
+        # Spec Points Mode
+        ttk.Label(frm, text="Spec Points:").grid(row=1, column=0, sticky="w", padx=6, pady=6)
+        app.cbo_spec_mode_1034a = ttk.Combobox(frm, values=["Auto (level-1)","Custom"], state="readonly", width=22)
+        app.cbo_spec_mode_1034a.grid(row=1, column=1, sticky="w", padx=6, pady=6)
+        app.cbo_spec_mode_1034a.set("Auto (level-1)")
+        app.ent_spec_custom_1034a = ttk.Spinbox(frm, from_=-999, to=999, width=8)
+        app.ent_spec_custom_1034a.grid(row=1, column=2, sticky="w", padx=6, pady=6)
+        ttk.Button(frm, text="Apply Points", command=lambda: _on_apply_points_btn_1034a(app)).grid(row=1, column=3, padx=6, pady=6)
+
+        # Hook save/encrypt path: auto-sync spec points with level
+        if not hasattr(app, "_orig_encrypt_write_1034a"):
+            if hasattr(app, "encrypt_and_write"):
+                app._orig_encrypt_write_1034a = app.encrypt_and_write
+
+                def _wrapped_encrypt_and_write(*args, **kwargs):
+                    try:
+                        st = app.save_data.setdefault('state', {})
+                        if st.get("spec_points_mode_1034a", "auto").startswith("custom"):
+                            # respect custom points
+                            pass
+                        else:
+                            _sync_points_with_level_1034a(app.save_data)
+                    except Exception:
+                        pass
+                    return app._orig_encrypt_write_1034a(*args, **kwargs)
+
+                app.encrypt_and_write = _wrapped_encrypt_and_write
+
+
+        # Minimal decoder hook: attach context menu if inventory list present
+        if hasattr(app, "inventory_list"):
+            try:
+                menu = tk.Menu(app.inventory_list, tearoff=0)
+                def _decode_cmd():
+                    sel = app._get_selected_serial_text() if hasattr(app,"_get_selected_serial_text") else None
+                    if not sel:
+                        messagebox.showwarning("Decode","No serial selected."); return
+                    info = _decode_serial_1034a(sel)
+                    lines = [
+                        f"Serial: {info.serial}",
+                        f"Type/Category: {info.item_type} / {info.item_category}",
+                        f"Confidence: {info.confidence}",
+                        f"Manufacturer: {info.stats.manufacturer}",
+                        f"Item Class: {info.stats.item_class}",
+                        f"Rarity: {info.stats.rarity}",
+                        f"Level: {info.stats.level}",
+                        f"Flags: {''.join(chr(c) for c in (info.stats.flags or [])) if info.stats.flags else 'N/A'}",
+                        f"Markers: {info.raw_fields.get('markers','')}",
+                    ]
+                    messagebox.showinfo("Decoded Item","\n".join(lines))
+                menu.add_command(label="Decode serial (1.034a)", command=_decode_cmd)
+                def _popup(event, m=menu): m.tk_popup(event.x_root, event.y_root)
+                app.inventory_list.bind("<Button-3>", _popup)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+def _on_apply_class_btn_1034a(app):
+    val = app.cbo_class_1034a.get().strip() if hasattr(app,"cbo_class_1034a") else ""
+    if not val:
+        messagebox.showwarning("Class","Pick a class."); return
+    _set_class_1034a(app.save_data, val)
+    messagebox.showinfo("Class", f"Class set to {val}.")
+
+def _on_unlock_all_btn_1034a(app):
+    chosen = (app.cbo_class_1034a.get().strip() if hasattr(app,"cbo_class_1034a") else "") or (app.save_data or {}).get('state',{}).get('class','')
+    # Resolve catalog from 1.033a
+    global PROFILE_UNLOCKS_1034A
+    PROFILE_UNLOCKS_1034A = _resolve_profile_unlocks_catalog_1034a(globals())
+    added_pkgs = _promote_reward_packages_1034a(app.save_data)
+    added_prof = 0
+    if PROFILE_UNLOCKS_1034A:
+        # Convert 1.033a structure (dict of lists) to our expected dict->entries
+        def to_entries(k):
+            v = PROFILE_UNLOCKS_1034A.get(k, [])
+            return v if isinstance(v, list) else v.get("entries", [])
+        merged = {
+            "shared_progress": {"entries": to_entries("shared_progress")},
+            "unlockable_darksiren": {"entries": to_entries("unlockable_darksiren")},
+            "unlockable_exosoldier": {"entries": to_entries("unlockable_exosoldier")},
+            "unlockable_gravitar": {"entries": to_entries("unlockable_gravitar")},
+            "unlockable_paladin": {"entries": to_entries("unlockable_paladin")},
+            "unlockable_echo4": {"entries": to_entries("unlockable_echo4")},
+            "unlockable_weapons": {"entries": to_entries("unlockable_weapons")},
+            "unlockable_vehicles": {"entries": to_entries("unlockable_vehicles")},
+        }
+        # Temporarily swap into our expected var
+        old = globals().get("PROFILE_UNLOCKS_1034A")
+        globals()["PROFILE_UNLOCKS_1034A"] = merged
+        added_prof = _merge_profile_unlocks_1034a(app.save_data, chosen)
+        globals()["PROFILE_UNLOCKS_1034A"] = old
+    messagebox.showinfo("Unlocks", f"Added {added_pkgs} package rewards and {added_prof} profile unlock entries.")
+
+def _on_unlock_map_btn_1034a(app):
+    changed = _maybe_unlock_map_1034a(app.save_data)
+    messagebox.showinfo("Map", f"Touched {changed} map/location flags.")
+# 'What’s New' banner function
+def whats_new_1034a():
+    return """
+    1.034a — What's New
+    ✓ Class switcher (DarkSiren, Paladin, Gravitar, ExoSoldier)
+    ✓ Unlock-All (class + core packs + map)
+    ✓ Embedded profile unlocks (skins, vehicles, Echo4, etc.)
+    ✓ Weapon serial decoder (integrated)
+    ✓ Spec points auto-sync with level
+    """
+
+def _on_apply_points_btn_1034a(app):
+    mode = app.cbo_spec_mode_1034a.get() if hasattr(app,"cbo_spec_mode_1034a") else "Auto (level-1)"
+    if mode.startswith("Custom"):
+        try:
+            val = int(app.ent_spec_custom_1034a.get())
+        except Exception:
+            messagebox.showerror("Spec Points","Enter a valid integer."); return
+        st = app.save_data.setdefault('state', {})
+        st["spec_points"] = val
+        st.setdefault("character_points", {})["unspent"] = val
+        st["spec_points_mode_1034a"] = "custom"
+        messagebox.showinfo("Spec Points", f"Custom points set to {val}.")
+    else:
+        st = app.save_data.setdefault('state', {})
+        st["spec_points_mode_1034a"] = "auto"
+        pts = _sync_points_with_level_1034a(app.save_data)
+        messagebox.showinfo("Spec Points", f"Auto-synced to {pts} (level-1).")
+
+
+def _open_yaml_file(self):
+    from tkinter import filedialog as fd, messagebox as mb
+    try:
+        path = fd.askopenfilename(title="Open YAML",
+                                  filetypes=[("YAML files", "*.yml *.yaml"), ("All files", "*.*")])
+        if not path:
+            return
+        p = Path(path)
+        txt = p.read_text(encoding="utf-8", errors="ignore")
+        if getattr(self, "yaml_text", None):
+            self.yaml_text.delete("1.0", "end")
+            self.yaml_text.insert("1.0", txt)
+        if 'yaml' in globals() and yaml is not None:
+            try:
+                self.yaml_obj = yaml.load(txt, Loader=get_yaml_loader())
+            except Exception as e:
+                self.log(f"YAML parse note: {e}")
+        self.yaml_path = p
+        try:
+            if getattr(self, 'save_path', None) is None:
+                self.save_path = p.with_suffix(".sav")
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "nb") and hasattr(self, "tab_yaml"):
+                self.nb.select(self.tab_yaml)
+        except Exception:
+            pass
+        self.log(f"Opened YAML: {p.name}")
+    except Exception as e:
+        try:
+            mb.showerror("Open YAML failed", str(e))
+        except Exception:
+            print("Open YAML failed:", e)
+
+def _encrypt_yaml_as_save(self):
+    from tkinter import filedialog as fd, messagebox as mb
+    if 'yaml' not in globals() or yaml is None:
+        try:
+            mb.showerror("Missing dependency", "PyYAML is required.\nInstall with: pip install pyyaml")
+        except Exception:
+            print("PyYAML missing")
+        return
+    uid = (self.user_id.get() or "").strip() if hasattr(self, "user_id") else ""
+    if not uid:
+        try:
+            mb.showerror("Missing User ID", "Enter your User ID (Steam64 or Epic numeric ID) first.")
+        except Exception:
+            print("Missing User ID")
+        return
+    txt = ""
+    if getattr(self, "yaml_text", None):
+        txt = self.yaml_text.get("1.0", "end")
+    elif getattr(self, "yaml_path", None):
+        try:
+            txt = Path(self.yaml_path).read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            txt = ""
+    try:
+        obj = yaml.load(txt, Loader=get_yaml_loader())
+        obj = extract_and_encode_serials_from_yaml(obj)
+        yb = yaml.safe_dump(obj, sort_keys=False, allow_unicode=True).encode()
+    except Exception as e:
+        try:
+            mb.showerror("Invalid YAML", f"Fix YAML before encrypting:\n{e}")
+        except Exception:
+            print("Invalid YAML:", e)
+        return
+    if getattr(self, "save_path", None):
+        out = self.save_path.with_suffix(".sav")
+    else:
+        dest = fd.asksaveasfilename(defaultextension=".sav", filetypes=[("BL4 Save", ".sav")])
+        if not dest:
+            return
+        out = Path(dest)
+    try:
+        plat = (getattr(self, "platform", None) or "epic").lower()
+        out.write_bytes(encrypt_from_yaml(yb, plat, uid))
+        self.log(f"Encrypted → {out.name}")
+        try:
+            mb.showinfo("Done", f"Saved {out.name}")
+        except Exception:
+            pass
+    except Exception as e:
+        try:
+            mb.showerror("Encrypt Failed", str(e))
+        except Exception:
+            pass
+        self.log(f"Encrypt error: {e}")
+
+
+# --- YAML button shims: attach tiny handlers to App if missing ---
+def __ensure_yaml_methods__():
+    try:
+        App  # ensure class exists
+    except Exception:
+        return
+
+    if not hasattr(App, "_open_yaml_file"):
+        def _open_yaml_file(self):
+            from tkinter import filedialog as fd, messagebox as mb
+            try:
+                path = fd.askopenfilename(title="Open YAML",
+                                          filetypes=[("YAML files","*.yml *.yaml"), ("All files","*.*")])
+                if not path:
+                    return
+                p = Path(path)
+                txt = p.read_text(encoding="utf-8", errors="ignore")
+                if getattr(self, "yaml_text", None):
+                    self.yaml_text.delete("1.0", "end")
+                    self.yaml_text.insert("1.0", txt)
+                if 'yaml' in globals() and yaml is not None:
+                    try:
+                        self.yaml_obj = yaml.load(txt, Loader=get_yaml_loader())
+                    except Exception as e:
+                        try: self.log(f"YAML parse note: {e}")
+                        except Exception: pass
+                self.yaml_path = p
+                try:
+                    if getattr(self, "save_path", None) is None:
+                        self.save_path = p.with_suffix(".sav")
+                except Exception:
+                    pass
+            except Exception as e:
+                try:
+                    mb.showerror("Open YAML failed", str(e))
+                except Exception:
+                    print("Open YAML failed:", e)
+        App._open_yaml_file = _open_yaml_file
+
+    if not hasattr(App, "_encrypt_yaml_as_save"):
+        def _encrypt_yaml_as_save(self):
+            from tkinter import filedialog as fd, messagebox as mb
+            if 'yaml' not in globals() or yaml is None:
+                try:
+                    mb.showerror("Missing dependency", "PyYAML is required.\nInstall with: pip install pyyaml")
+                except Exception:
+                    print("PyYAML missing")
+                return
+            uid = (self.user_id.get() or "").strip() if hasattr(self, "user_id") else ""
+            if not uid:
+                try:
+                    mb.showerror("Missing User ID", "Enter your User ID (Steam64 or Epic numeric ID) first.")
+                except Exception:
+                    print("Missing User ID")
+                return
+            txt = ""
+            if getattr(self, "yaml_text", None):
+                txt = self.yaml_text.get("1.0", "end")
+            elif getattr(self, "yaml_path", None):
+                try:
+                    txt = Path(self.yaml_path).read_text(encoding="utf-8", errors="ignore")
+                except Exception:
+                    txt = ""
+            try:
+                obj = yaml.load(txt, Loader=get_yaml_loader())
+                obj = extract_and_encode_serials_from_yaml(obj)
+                yb = yaml.safe_dump(obj, sort_keys=False, allow_unicode=True).encode()
+            except Exception as e:
+                try:
+                    mb.showerror("Invalid YAML", f"Fix YAML before encrypting:\n{e}")
+                except Exception:
+                    print("Invalid YAML:", e)
+                return
+            if getattr(self, "save_path", None):
+                out = self.save_path.with_suffix(".sav")
+            else:
+                dest = fd.asksaveasfilename(defaultextension=".sav", filetypes=[("BL4 Save", ".sav")])
+                if not dest:
+                    return
+                out = Path(dest)
+            try:
+                plat = (getattr(self, "platform", None) or "epic").lower()
+                out.write_bytes(encrypt_from_yaml(yb, plat, uid))
+                try: self.log(f"Encrypted → {out.name}")
+                except Exception: pass
+                try:
+                    mb.showinfo("Done", f"Saved {out.name}")
+                except Exception:
+                    pass
+            except Exception as e:
+                try:
+                    mb.showerror("Encrypt Failed", str(e))
+                except Exception:
+                    pass
+                try: self.log(f"Encrypt error: {e}")
+                except Exception: pass
+        App._encrypt_yaml_as_save = _encrypt_yaml_as_save
+
+try:
+    __ensure_yaml_methods__()
+except Exception:
+    pass
+
+
+def decode_items(save_dict):
+    """
+    Advanced item decoder for BL4.
+    Returns list of tuples: (ptr, friendly_name, code, serial, tags)
+    """
+    import json
+    results = []
+    for idx, item in enumerate(save_dict.get("items", [])):
+        serial = item.get("serial", "UNKNOWN")
+        code = item.get("code", "???")
+        balance_id = item.get("balance_id", "???")
+        friendly = WEAPON_NAME_MAP.get(balance_id, balance_id)
+        tags = {
+            "equipped": item.get("equipped", False),
+            "bank": item.get("bank", 0),
+            "rarity": item.get("rarity", "unknown")
+        }
+        results.append((idx, friendly, code, serial, tags))
+    return results
+
+
+def set_by(root, toks, value):
+    # Walk a yaml/dict/list structure following tokens that can include indexes like "items[75]".
+    # Auto-creates dict/list containers as needed and extends lists for out-of-range indexes.
+    import re as _re
+    cur = root
+    for raw in toks[:-1]:
+        m = _re.match(r"^([^\[\]]+)(?:\[(\d+)\])?$", str(raw))
+        if not m:
+            key = str(raw)
+            if isinstance(cur, dict):
+                if key not in cur or cur[key] is None:
+                    cur[key] = {}
+                cur = cur[key]
+            else:
+                raise KeyError(raw)
+        else:
+            key, idx = m.group(1), m.group(2)
+            if idx is None:
+                if not isinstance(cur, dict):
+                    raise KeyError(raw)
+                if key not in cur or cur[key] is None:
+                    cur[key] = {}
+                cur = cur[key]
+            else:
+                if not isinstance(cur, dict):
+                    raise KeyError(raw)
+                if key not in cur or cur[key] is None or not isinstance(cur[key], list):
+                    cur[key] = []
+                lst = cur[key]
+                i = int(idx)
+                while len(lst) <= i:
+                    lst.append({})
+                cur = lst[i]
+    last = str(toks[-1])
+    m = _re.match(r"^([^\[\]]+)(?:\[(\d+)\])?$", last)
+    if m and m.group(2) is not None:
+        key, idx = m.group(1), int(m.group(2))
+        if key not in cur or not isinstance(cur[key], list):
+            cur[key] = []
+        lst = cur[key]
+        while len(lst) <= idx:
+            lst.append(None)
+        lst[idx] = value
+    else:
+        if isinstance(cur, dict):
+            cur[last] = value
+        else:
+            raise KeyError(last)
+    return root
+
+
+
+def _simple_name_from_serial(serial: str) -> str:
+    s = str(serial or "").strip()
+    if not s.startswith("@Ug"):
+        return ""
+    mfgr_map = {
+        "Fme!K": "Maliwan",
+        "Fme!V": "Vladof",
+        "Fme!H": "Hyperion",
+        "Fme!D": "Dahl",
+        "Fme!J": "Jakobs",
+        "Fme!T": "Tediore",
+        "Fme!A": "Atlas",
+        "Fme!C": "COV",
+        "Fme!N": "Torgue",
+        "Fme!S": "S&S",
+    }
+    import re as _re
+    m = _re.search(r"\{(Fme![A-Z])", s)
+    brand = mfgr_map.get(m.group(1), "") if m else ""
+    cls = ""
+    if s.startswith("@UgeU_") or "UGe Shotgun" in s:
+        cls = "Shotgun"
+    elif s.startswith("@Ugr") or "@Ugr" in s:
+        cls = "Rifle"
+    elif s.startswith("@Ugg") or "@Ugg" in s:
+        cls = "SMG"
+    elif s.startswith("@Ugp") or "@Ugp" in s:
+        cls = "Pistol"
+    elif s.startswith("@Ugs") or "@Ugs" in s:
+        cls = "Sniper"
+    elif s.startswith("@Ugx") or "@Ugx" in s:
+        cls = "Launcher"
+    if brand and cls:
+        return f"{brand} {cls}"
+    return brand or cls
+
